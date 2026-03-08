@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: mental-wellness
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn mental_wellness.wsgi:application"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: YOUTUBE_API_KEY
+        sync: false      # set manually in Render dashboard
+      - key: ANTHROPIC_API_KEY
+        sync: false      # set manually in Render dashboard

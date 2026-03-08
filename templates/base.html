@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Mellow — Mental Wellness Support{% endblock %}</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Nunito', 'sans-serif'],
+            body: ['Quicksand', 'sans-serif'],
+          },
+          colors: {
+            cream: '#FFF9F0',
+            blush: '#FFE8E8',
+            sage: '#D4EDDA',
+            sky: '#D6EEF8',
+            lavender: '#E8E3F5',
+            peach: '#FFE0CC',
+          },
+          animation: {
+            'float': 'float 3s ease-in-out infinite',
+            'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
+            'bounce-slow': 'bounce 2s infinite',
+            'fade-in': 'fadeIn 0.6s ease-out forwards',
+            'slide-up': 'slideUp 0.5s ease-out forwards',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-12px)' },
+            },
+            'pulse-soft': {
+              '0%, 100%': { opacity: '1' },
+              '50%': { opacity: '0.7' },
+            },
+            fadeIn: {
+              from: { opacity: '0' },
+              to: { opacity: '1' },
+            },
+            slideUp: {
+              from: { opacity: '0', transform: 'translateY(20px)' },
+              to: { opacity: '1', transform: 'translateY(0)' },
+            },
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+      background: linear-gradient(135deg, #FFF9F0 0%, #FFE8F5 50%, #E8F4FF 100%);
+      min-height: 100vh;
+    }
+
+    /* Pastel bubble background */
+    .bg-bubbles {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bubble {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.18;
+      animation: drift linear infinite;
+    }
+    @keyframes drift {
+      0%   { transform: translateY(110vh) scale(0.8); }
+      100% { transform: translateY(-20vh) scale(1.2); }
+    }
+
+    .card {
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.9);
+    }
+
+    /* Star rating */
+    .star-btn { cursor: pointer; transition: transform 0.15s; }
+    .star-btn:hover { transform: scale(1.25); }
+    .star-btn.active { color: #FBBF24; }
+    .star-btn.inactive { color: #D1D5DB; }
+
+    /* Emotion button hover glow */
+    .emotion-btn {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .emotion-btn:hover {
+      transform: translateY(-4px) scale(1.04);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+    }
+    .emotion-btn:active { transform: scale(0.97); }
+
+    /* Mascot */
+    .mascot-face {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    /* Video card */
+    .video-card {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .video-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.1);
+    }
+
+    /* Toast */
+    #toast {
+      transition: opacity 0.4s, transform 0.4s;
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="relative">
+
+  <!-- Floating background bubbles -->
+  <div class="bg-bubbles" aria-hidden="true">
+    {% for i in "12345678" %}
+    <div class="bubble" style="
+      width: {{ forloop.counter|add:40 }}px;
+      height: {{ forloop.counter|add:40 }}px;
+      left: {{ forloop.counter0|add:10 }}0%;
+      background: hsl({{ forloop.counter|add:200 }}, 70%, 75%);
+      animation-duration: {{ forloop.counter|add:8 }}s;
+      animation-delay: -{{ forloop.counter|add:2 }}s;
+    "></div>
+    {% endfor %}
+  </div>
+
+  <!-- Nav -->
+  <nav class="relative z-10 px-6 py-4 flex items-center justify-between max-w-5xl mx-auto">
+    <a href="{% url 'wellness:landing' %}" class="flex items-center gap-2 group">
+      <span class="text-2xl">🌸</span>
+      <span class="font-display font-800 text-xl text-rose-400 group-hover:text-rose-500 transition-colors">Mellow</span>
+    </a>
+    <span class="text-sm text-gray-400 font-body">Your wellness companion</span>
+  </nav>
+
+  <!-- Main content -->
+  <main class="relative z-10">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Toast notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 opacity-0 translate-y-4 pointer-events-none">
+    <div class="bg-white rounded-2xl shadow-xl px-5 py-3 flex items-center gap-3 border border-gray-100">
+      <span id="toast-icon" class="text-xl">✅</span>
+      <span id="toast-text" class="text-sm font-body text-gray-700"></span>
+    </div>
+  </div>
+
+  <script>
+    function showToast(message, icon = '✅') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-text').textContent = message;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3000);
+    }
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

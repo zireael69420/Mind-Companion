@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Mellow — Videos for when you feel {{ config.label }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+
+  <!-- Back button -->
+  <a href="{% url 'wellness:landing' %}" class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-6 font-body">
+    ← Choose a different feeling
+  </a>
+
+  <!-- Emotion header -->
+  <div class="text-center mb-6 animate-fade-in">
+    <span class="text-6xl mb-3 block">{{ config.emoji }}</span>
+    <h1 class="font-display font-900 text-3xl text-gray-700">
+      Feeling <span style="color:{{ config.color }}">{{ config.label }}</span>
+    </h1>
+  </div>
+
+  <!-- AI message bubble -->
+  <div class="card rounded-3xl p-6 mb-8 max-w-2xl mx-auto shadow-md animate-slide-up text-center">
+    <div class="flex items-start gap-3 justify-center">
+      <span class="text-2xl flex-shrink-0 mt-0.5">🌸</span>
+      <p class="font-body text-gray-600 leading-relaxed text-base italic">
+        "{{ ai_message }}"
+      </p>
+    </div>
+    <p class="text-xs text-gray-300 mt-3">— Mellow, your wellness companion</p>
+  </div>
+
+  <!-- Videos section -->
+  <h2 class="font-display font-700 text-lg text-gray-600 mb-4 text-center">
+    🎬 Watch something helpful
+  </h2>
+
+  {% if videos %}
+  <div class="grid gap-5 sm:grid-cols-2 mb-10">
+    {% for video in videos %}
+    <div class="video-card card rounded-2xl overflow-hidden shadow-md" data-video-db-id="{{ video.id|default:'' }}" data-video-yt-id="{{ video.youtube_video_id }}" data-video-title="{{ video.title }}">
+
+      <!-- Thumbnail / Embed toggle -->
+      <div class="relative bg-gray-100 group cursor-pointer" onclick="loadEmbed(this, '{{ video.youtube_video_id }}')" id="thumb-{{ forloop.counter }}">
+        <img
+          src="{{ video.thumbnail_url|default:'https://img.youtube.com/vi/'|add:video.youtube_video_id|add:'/mqdefault.jpg' }}"
+          alt="{{ video.title }}"
+          class="w-full h-48 object-cover"
+          onerror="this.src='https://img.youtube.com/vi/{{ video.youtube_video_id }}/mqdefault.jpg'"
+        />
+        <!-- Play button overlay -->
+        <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors rounded-t-2xl">
+          <div class="bg-white/90 rounded-full p-3 shadow-lg group-hover:scale-110 transition-transform">
+            <svg class="w-8 h-8 text-rose-400 ml-1" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Embed container (hidden by default) -->
+      <div id="embed-{{ forloop.counter }}" class="hidden">
+        <iframe
+          width="100%"
+          height="220"
+          src=""
+          data-src="{{ video.embed_url }}?autoplay=1&rel=0"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+          class="w-full"
+        ></iframe>
+      </div>
+
+      <!-- Video info + rating -->
+      <div class="p-4">
+        <h3 class="font-display font-700 text-gray-700 text-sm leading-snug mb-3">{{ video.title }}</h3>
+
+        <!-- Star rating -->
+        <div class="flex items-center gap-1 mb-2" data-video-idx="{{ forloop.counter }}">
+          <span class="text-xs text-gray-400 mr-1 font-body">Rate:</span>
+          {% for star in "12345" %}
+          <button
+            class="star-btn inactive text-2xl leading-none"
+            data-star="{{ forloop.counter }}"
+            data-video-idx="{{ forloop.parentloop.counter }}"
+            onclick="handleStar(this)"
+            aria-label="{{ forloop.counter }} star"
+          >★</button>
+          {% endfor %}
+          <span class="text-xs text-gray-300 ml-1 star-label font-body"></span>
+        </div>
+
+        <!-- Optional feedback -->
+        <div class="feedback-area hidden mt-2">
+          <textarea
+            placeholder="Any thoughts? (optional)"
+            class="w-full text-xs rounded-xl border border-gray-100 bg-gray-50 p-2 resize-none focus:outline-none focus:ring-2 focus:ring-rose-200 font-body"
+            rows="2"
+          ></textarea>
+          <button
+            onclick="submitRating(this)"
+            data-video-idx="{{ forloop.counter }}"
+            data-video-db-id="{{ video.id|default:'' }}"
+            data-video-yt-id="{{ video.youtube_video_id }}"
+            data-video-title="{{ video.title }}"
+            class="mt-2 w-full text-xs font-display font-700 py-2 rounded-xl text-white transition-all"
+            style="background: {{ config.color }};"
+          >
+            Submit Rating ✨
+          </button>
+        </div>
+
+        <!-- Rated confirmation -->
+        <div class="rated-msg hidden text-xs text-green-500 font-body flex items-center gap-1 mt-1">
+          ✅ Thank you for rating!
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="card rounded-2xl p-8 text-center text-gray-400 font-body">
+    <p class="text-3xl mb-2">🎬</p>
+    <p>No videos found right now. Please check back soon!</p>
+  </div>
+  {% endif %}
+
+  <!-- Done button -->
+  <div class="text-center mt-4">
+    <a href="{% url 'wellness:thank_you' %}?emotion={{ emotion }}"
+       class="inline-block font-display font-700 px-8 py-3 rounded-full text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+       style="background: linear-gradient(135deg, {{ config.color }}, #FF90C2);">
+      I'm done watching 🌸
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const SESSION_ID = "{{ session_id }}";
+  const EMOTION = "{{ emotion }}";
+  const CSRF_TOKEN = "{{ csrf_token }}";
+  let selectedStars = {};   // { videoIdx: starCount }
+
+  function loadEmbed(thumbEl, ytId) {
+    const idx = thumbEl.id.replace('thumb-', '');
+    const embedContainer = document.getElementById('embed-' + idx);
+    const iframe = embedContainer.querySelector('iframe');
+    iframe.src = iframe.dataset.src;
+    thumbEl.classList.add('hidden');
+    embedContainer.classList.remove('hidden');
+  }
+
+  function handleStar(btn) {
+    const star = parseInt(btn.dataset.star);
+    const vidIdx = btn.dataset.videoIdx;
+    selectedStars[vidIdx] = star;
+
+    // Update visual
+    const container = btn.closest('[data-video-idx]');
+    const stars = container.querySelectorAll('.star-btn');
+    stars.forEach((s, i) => {
+      if (i < star) {
+        s.classList.add('active');
+        s.classList.remove('inactive');
+      } else {
+        s.classList.remove('active');
+        s.classList.add('inactive');
+      }
+    });
+
+    const label = container.querySelector('.star-label');
+    const labels = ['', 'Not helpful', 'Slightly helpful', 'Helpful', 'Very helpful', 'Amazing!'];
+    label.textContent = labels[star] || '';
+
+    // Show feedback area
+    const card = btn.closest('.video-card');
+    card.querySelector('.feedback-area').classList.remove('hidden');
+  }
+
+  async function submitRating(btn) {
+    const vidIdx = btn.dataset.videoIdx;
+    const stars = selectedStars[vidIdx] || 0;
+    const card = btn.closest('.video-card');
+    const feedback = card.querySelector('textarea').value;
+
+    const payload = {
+      stars,
+      emotion: EMOTION,
+      video_id: btn.dataset.videoDbId || null,
+      youtube_video_id: btn.dataset.videoYtId,
+      title: btn.dataset.videoTitle,
+      session_id: SESSION_ID,
+      feedback,
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      const resp = await fetch("{% url 'wellness:submit_rating' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        card.querySelector('.feedback-area').classList.add('hidden');
+        card.querySelector('.rated-msg').classList.remove('hidden');
+        showToast('Rating saved! Thank you 💙', '⭐');
+      } else {
+        showToast('Oops, something went wrong.', '❌');
+        btn.disabled = false;
+        btn.textContent = 'Submit Rating ✨';
+      }
+    } catch {
+      showToast('Network error. Please try again.', '❌');
+      btn.disabled = false;
+      btn.textContent = 'Submit Rating ✨';
+    }
+  }
+</script>
+{% endblock %}

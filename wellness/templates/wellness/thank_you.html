@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Mellow — Hope you feel better!{% endblock %}
+
+{% block content %}
+<div class="min-h-[85vh] flex flex-col items-center justify-center px-4 py-12 text-center">
+
+  <!-- Mascot happy -->
+  <div class="mascot-face mb-6 select-none">
+    <svg width="160" height="160" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="90" cy="92" r="72" fill="url(#glow2)" opacity="0.3"/>
+      <circle cx="90" cy="90" r="68" fill="url(#bodyGrad2)"/>
+      <ellipse cx="60" cy="108" rx="14" ry="9" fill="#FFB3C6" opacity="0.7"/>
+      <ellipse cx="120" cy="108" rx="14" ry="9" fill="#FFB3C6" opacity="0.7"/>
+      <!-- Happy closed eyes -->
+      <path d="M 59 80 Q 70 70 81 80" stroke="#2D2D2D" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <path d="M 99 80 Q 110 70 121 80" stroke="#2D2D2D" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <!-- Big smile -->
+      <path d="M 62 102 Q 90 128 118 102" stroke="#2D2D2D" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <ellipse cx="22" cy="72" rx="14" ry="18" fill="url(#bodyGrad2)"/>
+      <ellipse cx="158" cy="72" rx="14" ry="18" fill="url(#bodyGrad2)"/>
+      <ellipse cx="22" cy="72" rx="7" ry="11" fill="#FFB3C6" opacity="0.7"/>
+      <ellipse cx="158" cy="72" rx="7" ry="11" fill="#FFB3C6" opacity="0.7"/>
+      <text x="84" y="56" font-size="18" text-anchor="middle">✨</text>
+      <defs>
+        <radialGradient id="bodyGrad2" cx="40%" cy="35%" r="65%">
+          <stop offset="0%" stop-color="#FFE8F5"/>
+          <stop offset="100%" stop-color="#FFC2D9"/>
+        </radialGradient>
+        <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#FFD6EC"/>
+          <stop offset="100%" stop-color="#FFD6EC" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+    </svg>
+  </div>
+
+  <!-- Message -->
+  <div class="card rounded-3xl px-8 py-6 max-w-sm shadow-lg animate-fade-in mb-8">
+    <h1 class="font-display font-900 text-2xl text-gray-700 mb-2">
+      I hope you feel a<br/>
+      <span class="text-rose-400">little better</span> 🌸
+    </h1>
+    <p class="font-body text-gray-500 text-sm leading-relaxed">
+      Remember, it's okay to feel all kinds of emotions. You took a moment for yourself today — that matters. 💙
+    </p>
+  </div>
+
+  <!-- Feeling again? -->
+  {% if config %}
+  <div class="card rounded-2xl px-6 py-4 max-w-xs shadow-md animate-slide-up mb-6">
+    <p class="font-body text-sm text-gray-500 mb-3">You were feeling <strong class="font-display" style="color:{{ config.color }}">{{ config.emoji }} {{ config.label }}</strong> today.</p>
+    <p class="text-xs text-gray-400 font-body">Your session has been saved. Thank you for using Mellow!</p>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  <div class="flex flex-col sm:flex-row gap-3">
+    <a href="{% url 'wellness:landing' %}"
+       class="font-display font-700 px-7 py-3 rounded-full text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+       style="background:linear-gradient(135deg, #FF90C2, #FFB347);">
+      Start Again 🌸
+    </a>
+    {% if emotion %}
+    <a href="{% url 'wellness:recommendations' emotion %}"
+       class="font-display font-700 px-7 py-3 rounded-full text-gray-600 bg-white shadow-md hover:shadow-lg border border-gray-100 transition-all hover:-translate-y-0.5">
+      Watch More Videos 🎬
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Disclaimer -->
+  <p class="mt-10 text-xs text-gray-300 font-body max-w-xs text-center">
+    If you're struggling, please reach out to a mental health professional or a trusted person in your life. You're not alone. 💙
+  </p>
+
+</div>
+{% endblock %}
