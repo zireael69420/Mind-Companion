@@ -1,365 +1,302 @@
-{% extends 'base.html' %}
-{% block title %}Mellow — How are you feeling today?{% endblock %}
+{% comment %}
+FILE: wellness/templates/wellness/landing.html
+{% endcomment %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mellow — How are you feeling today?</title>
 
-{% block extra_head %}
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
-<style>
-  :root {
-    --peach:   #FFCBA4;
-    --rose:    #FFB3C6;
-    --mint:    #B5EAD7;
-    --butter:  #FFF1A8;
-    --lilac:   #D4B8E0;
-    --sky:     #AED9E0;
-    --coral:   #FF8FA3;
-    --cream:   #FFF8F0;
-    --ink:     #3D2C35;
-    --muted:   #9B8EA0;
-  }
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <!-- GSAP + plugins -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--cream);
-    min-height: 100vh;
-    overflow-x: hidden;
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6' fill='%23FFB3C6' opacity='0.8'/%3E%3C/svg%3E") 12 12, auto;
-  }
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet"/>
 
-  /* ── Layered gradient mesh background ── */
-  .bg-mesh {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(ellipse 70% 55% at 15% 20%,  #FFE4EC88 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 85% 15%,  #D4F5EC88 0%, transparent 55%),
-      radial-gradient(ellipse 55% 60% at 80% 85%,  #E8D5F588 0%, transparent 60%),
-      radial-gradient(ellipse 65% 50% at 10% 80%,  #FFF3C488 0%, transparent 55%),
-      radial-gradient(ellipse 80% 80% at 50% 50%,  #FFF8F0   0%, transparent 70%);
-  }
+  <style>
+    :root {
+      --ink:   #3D2C35;
+      --muted: #9B8EA0;
+      --cream: #FFF8F0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── Floating deco blobs ── */
-  .blob {
-    position: fixed; border-radius: 60% 40% 70% 30% / 50% 60% 40% 70%;
-    filter: blur(1px); opacity: 0.22; pointer-events: none; z-index: 0;
-    animation: morphBlob linear infinite alternate;
-  }
-  @keyframes morphBlob {
-    0%   { border-radius: 60% 40% 70% 30% / 50% 60% 40% 70%; transform: scale(1)   rotate(0deg); }
-    50%  { border-radius: 40% 60% 30% 70% / 70% 30% 60% 40%; transform: scale(1.05) rotate(5deg); }
-    100% { border-radius: 70% 30% 50% 50% / 40% 70% 30% 60%; transform: scale(0.97) rotate(-3deg); }
-  }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      min-height: 100vh;
+      overflow: hidden;
+    }
 
-  /* Tiny sparkles */
-  .sparkle {
-    position: fixed; pointer-events: none; z-index: 1;
-    animation: sparklePop ease-in-out infinite;
-  }
-  @keyframes sparklePop {
-    0%,100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
-    50%      { opacity: 1; transform: scale(1)   rotate(180deg); }
-  }
+    /* ── Canvas for particles ── */
+    #particle-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
 
-  /* ── Page layout ── */
-  .page-wrap {
-    position: relative; z-index: 2;
-    min-height: 100vh;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 2rem 1rem 4rem;
-    gap: 0;
-  }
+    /* ── Gradient mesh background ── */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 55% at 15% 20%, #FFE4EC99 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 15%, #D4F5EC99 0%, transparent 55%),
+        radial-gradient(ellipse 55% 60% at 80% 85%, #E8D5F599 0%, transparent 60%),
+        radial-gradient(ellipse 65% 50% at 10% 80%, #FFF3C499 0%, transparent 55%),
+        var(--cream);
+      animation: meshShift 12s ease-in-out infinite alternate;
+    }
+    @keyframes meshShift {
+      0%   { filter: hue-rotate(0deg)   brightness(1);    }
+      50%  { filter: hue-rotate(8deg)   brightness(1.02); }
+      100% { filter: hue-rotate(-6deg)  brightness(0.99); }
+    }
 
-  /* ── Header text ── */
-  .headline-wrap {
-    text-align: center;
-    opacity: 0; transform: translateY(-18px);
-    animation: revealDown 0.7s cubic-bezier(.22,1,.36,1) 0.2s forwards;
-  }
-  @keyframes revealDown {
-    to { opacity: 1; transform: translateY(0); }
-  }
+    /* ── Layout ── */
+    .page {
+      position: relative; z-index: 2;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 0; padding: 1.5rem 1rem 3rem;
+    }
 
-  .eyebrow {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem; font-weight: 500; letter-spacing: 0.18em;
-    color: var(--muted); text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
+    /* ── Headline ── */
+    .headline { text-align: center; }
+    .eyebrow {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.72rem; font-weight: 400; letter-spacing: 0.2em;
+      color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem;
+      font-style: italic;
+    }
+    h1 {
+      font-family: 'Baloo 2', sans-serif;
+      font-size: clamp(1.9rem, 4.5vw, 3rem);
+      font-weight: 900; line-height: 1.1; color: var(--ink);
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #FF6B9D 0%, #FFA45C 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .sub {
+      margin-top: 0.55rem; font-size: 0.9rem; color: var(--muted);
+      font-weight: 300; font-style: italic;
+    }
 
-  h1 {
-    font-family: 'Baloo 2', sans-serif;
-    font-size: clamp(2rem, 5vw, 3.2rem);
-    font-weight: 900; line-height: 1.1;
-    color: var(--ink);
-    background: linear-gradient(135deg, #3D2C35 30%, #B25082 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+    /* ── Scene container ── */
+    .scene {
+      position: relative;
+      width: min(480px, 88vw);
+      height: min(480px, 88vw);
+      margin: 0.5rem auto;
+      flex-shrink: 0;
+    }
 
-  h1 span {
-    display: inline-block;
-    background: linear-gradient(135deg, #FF6B9D, #FFA45C);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+    /* Decorative orbit ring */
+    .orbit-ring {
+      position: absolute; inset: 10%;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(178, 80, 130, 0.12);
+    }
 
-  .sub {
-    margin-top: 0.6rem;
-    font-size: 0.95rem; color: var(--muted); font-weight: 300;
-    font-style: italic;
-  }
+    /* ── Mascot ── */
+    .mascot-wrap {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      will-change: transform;
+    }
+    .mascot-svg {
+      width: clamp(130px, 25vw, 175px);
+      filter: drop-shadow(0 16px 36px rgba(178,80,130,0.2))
+              drop-shadow(0 4px 10px rgba(0,0,0,0.07));
+    }
+    /* Mascot aura */
+    .mascot-aura {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: clamp(170px, 34vw, 225px);
+      height: clamp(170px, 34vw, 225px);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,179,198,0.3) 0%, transparent 70%);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
 
-  /* ── Orbital scene ── */
-  .scene {
-    position: relative;
-    width: min(520px, 90vw);
-    height: min(520px, 90vw);
-    margin: 1.5rem auto -1rem;
-  }
+    /* ── Emotion buttons ── */
+    .emotion-btn {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: pointer; border: none; background: none; padding: 0;
+      text-decoration: none;
+      will-change: transform;
+    }
+    .btn-pill {
+      display: flex; align-items: center; gap: 8px;
+      padding: 11px 20px; border-radius: 999px;
+      font-family: 'Baloo 2', sans-serif;
+      font-size: clamp(0.82rem, 1.8vw, 0.95rem);
+      font-weight: 700; color: var(--ink);
+      border: 2px solid rgba(255,255,255,0.88);
+      backdrop-filter: blur(12px);
+      box-shadow:
+        0 5px 20px rgba(0,0,0,0.09),
+        inset 0 1px 0 rgba(255,255,255,0.95);
+      white-space: nowrap;
+      position: relative; overflow: hidden;
+      /* glow variable set per-button */
+      transition: box-shadow 0.3s ease;
+    }
+    .btn-pill::before {
+      /* hover glow layer */
+      content: '';
+      position: absolute; inset: 0; border-radius: inherit;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.5) 0%, transparent 70%);
+    }
+    .emotion-btn:hover .btn-pill::before { opacity: 1; }
 
-  /* Orbit ring (decorative) */
-  .orbit-ring {
-    position: absolute; inset: 0;
-    border-radius: 50%;
-    border: 1.5px dashed rgba(178,80,130,0.13);
-    animation: spinRing 28s linear infinite;
-  }
-  @keyframes spinRing { to { transform: rotate(360deg); } }
-  .orbit-ring:nth-child(2) {
-    inset: 12%; border-color: rgba(86,178,150,0.10);
-    animation-duration: 20s; animation-direction: reverse;
-  }
+    .btn-angry    { background: linear-gradient(135deg, #FFCDD2, #FFAB91); }
+    .btn-anxious  { background: linear-gradient(135deg, #B2EBF2, #80DEEA); }
+    .btn-stressed { background: linear-gradient(135deg, #DCEDC8, #A5D6A7); }
+    .btn-restless { background: linear-gradient(135deg, #FFF9C4, #FFE082); }
 
-  /* ── Mascot ── */
-  .mascot-wrap {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    animation: floatMascot 4s ease-in-out infinite;
-    opacity: 0; animation-delay: 0.5s;
-    animation-fill-mode: forwards;
-  }
-  @keyframes floatMascot {
-    0%   { opacity:1; transform: translate(-50%,-50%) translateY(0px); }
-    50%  { opacity:1; transform: translate(-50%,-50%) translateY(-14px); }
-    100% { opacity:1; transform: translate(-50%,-50%) translateY(0px); }
-  }
+    .btn-angry:hover    { box-shadow: 0 0 24px 6px rgba(255,100,100,0.3),  0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
+    .btn-anxious:hover  { box-shadow: 0 0 24px 6px rgba(0,188,212,0.3),    0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
+    .btn-stressed:hover { box-shadow: 0 0 24px 6px rgba(76,175,80,0.28),   0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
+    .btn-restless:hover { box-shadow: 0 0 24px 6px rgba(255,200,0,0.3),    0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
 
-  .mascot-svg {
-    width: clamp(140px, 28vw, 190px);
-    filter: drop-shadow(0 18px 40px rgba(178,80,130,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.06));
-  }
+    .btn-emoji { font-size: 1.35rem; line-height: 1; }
+    .orbit-dot {
+      width: 5px; height: 5px; border-radius: 50%; opacity: 0.55;
+    }
 
-  /* Mascot ambient glow pulse */
-  .glow-ring {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: clamp(180px, 36vw, 240px); height: clamp(180px, 36vw, 240px);
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,180,200,0.35) 0%, transparent 70%);
-    animation: glowPulse 3s ease-in-out infinite;
-    pointer-events: none;
-  }
-  @keyframes glowPulse {
-    0%,100% { transform: translate(-50%,-50%) scale(1);   opacity: 0.7; }
-    50%      { transform: translate(-50%,-50%) scale(1.15); opacity: 1;   }
-  }
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1.2rem;
+      background: rgba(255,248,240,0.92);
+      backdrop-filter: blur(6px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    #loading-overlay.show { opacity: 1; pointer-events: all; }
+    .loading-mascot { font-size: 3.5rem; }
+    .loading-text {
+      font-family: 'Baloo 2', sans-serif;
+      font-size: 1.1rem; font-weight: 700; color: var(--ink);
+    }
+    .loading-dots span {
+      display: inline-block;
+      animation: dotBounce 1.2s ease-in-out infinite;
+    }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
 
-  /* ── Emotion buttons — orbital positioning ── */
-  .emotion-btn {
-    position: absolute;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    cursor: pointer; border: none; background: none; padding: 0;
-    text-decoration: none;
+    /* ── Ripple on click ── */
+    .click-ripple {
+      position: fixed; pointer-events: none; z-index: 500;
+      width: 40px; height: 40px; border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0.7;
+    }
 
-    /* individual float animation applied via JS */
-    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), filter 0.2s;
-    opacity: 0;
-    animation: fadeInBtn 0.5s ease forwards;
-  }
+    /* ── Footer ── */
+    .footer-note {
+      text-align: center; font-size: 0.68rem;
+      color: var(--muted); line-height: 1.7;
+      position: relative; z-index: 2;
+    }
 
-  @keyframes fadeInBtn {
-    to { opacity: 1; }
-  }
+    @media (max-width: 420px) {
+      .scene { width: 94vw; height: 94vw; }
+    }
+  </style>
+</head>
+<body>
 
-  .btn-pill {
-    display: flex; align-items: center; gap: 9px;
-    padding: 12px 22px; border-radius: 999px;
-    font-family: 'Baloo 2', sans-serif;
-    font-size: clamp(0.85rem, 2vw, 1rem);
-    font-weight: 700; color: var(--ink);
-    border: 2.5px solid rgba(255,255,255,0.85);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.9);
-    transition:
-      transform 0.25s cubic-bezier(.34,1.56,.64,1),
-      box-shadow 0.25s ease,
-      filter 0.2s;
-    white-space: nowrap;
-    position: relative; overflow: hidden;
-  }
+<!-- Canvas particles -->
+<canvas id="particle-canvas"></canvas>
 
-  .btn-pill::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 55%);
-    border-radius: inherit; pointer-events: none;
-  }
-
-  .emotion-btn:hover .btn-pill {
-    transform: scale(1.12) translateY(-4px);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.9);
-    filter: brightness(1.05);
-  }
-  .emotion-btn:active .btn-pill {
-    transform: scale(0.96);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  }
-
-  .btn-emoji { font-size: 1.4rem; line-height: 1; }
-  .btn-label { font-size: inherit; }
-
-  /* Per-emotion colours */
-  .btn-angry   { background: linear-gradient(135deg, #FFCDD2, #FFAB91); }
-  .btn-anxious { background: linear-gradient(135deg, #B2EBF2, #80DEEA); }
-  .btn-stressed{ background: linear-gradient(135deg, #DCEDC8, #A5D6A7); }
-  .btn-restless{ background: linear-gradient(135deg, #FFF9C4, #FFE082); }
-
-  .btn-angry:hover   { box-shadow: 0 16px 40px rgba(255,100,100,0.2), inset 0 1px 0 rgba(255,255,255,0.9); }
-  .btn-anxious:hover { box-shadow: 0 16px 40px rgba(0,188,212,0.18), inset 0 1px 0 rgba(255,255,255,0.9); }
-  .btn-stressed:hover{ box-shadow: 0 16px 40px rgba(100,200,120,0.2), inset 0 1px 0 rgba(255,255,255,0.9); }
-  .btn-restless:hover{ box-shadow: 0 16px 40px rgba(255,200,0,0.2), inset 0 1px 0 rgba(255,255,255,0.9); }
-
-  /* Tiny orbit dot indicator */
-  .orbit-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    opacity: 0.6;
-    animation: dotBlink 2.5s ease-in-out infinite;
-  }
-  @keyframes dotBlink { 0%,100%{opacity:0.3;} 50%{opacity:0.9;} }
-
-  /* ── Footer note ── */
-  .footer-note {
-    position: relative; z-index: 2;
-    text-align: center; margin-top: 2.5rem;
-    font-size: 0.72rem; color: var(--muted);
-    letter-spacing: 0.02em; line-height: 1.7;
-    opacity: 0; animation: revealDown 0.6s ease 1.4s forwards;
-  }
-  .footer-note a { color: var(--coral); text-decoration: none; }
-  .footer-note a:hover { text-decoration: underline; }
-
-  /* ── Loading ripple on click ── */
-  .ripple-wrap {
-    position: fixed; inset: 0; pointer-events: none; z-index: 100;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; transition: opacity 0.3s;
-  }
-  .ripple-wrap.active { opacity: 1; }
-  .ripple {
-    width: 60px; height: 60px; border-radius: 50%;
-    animation: rippleOut 0.6s ease-out forwards;
-  }
-  @keyframes rippleOut {
-    0%   { transform: scale(0); opacity: 0.8; }
-    100% { transform: scale(18); opacity: 0; }
-  }
-
-  /* ── Responsive tweaks ── */
-  @media (max-width: 480px) {
-    .scene { width: 92vw; height: 92vw; }
-    h1 { font-size: 1.75rem; }
-  }
-</style>
-{% endblock %}
-
-{% block content %}
-
-<!-- Background layers -->
+<!-- Gradient mesh -->
 <div class="bg-mesh"></div>
 
-<!-- Decorative blobs -->
-<div class="blob" style="width:340px;height:280px;top:-60px;left:-80px;background:var(--rose);animation-duration:18s;"></div>
-<div class="blob" style="width:260px;height:300px;bottom:-40px;right:-60px;background:var(--mint);animation-duration:22s;animation-delay:-8s;"></div>
-<div class="blob" style="width:200px;height:220px;bottom:10%;left:5%;background:var(--butter);animation-duration:15s;animation-delay:-4s;"></div>
-<div class="blob" style="width:180px;height:160px;top:15%;right:4%;background:var(--lilac);animation-duration:20s;animation-delay:-11s;"></div>
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loading-mascot">🌸</div>
+  <div class="loading-text">Finding something helpful<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></div>
+</div>
 
-<!-- Sparkles -->
-<div class="sparkle" style="top:18%;left:22%;font-size:1.1rem;animation-duration:3.2s;">✦</div>
-<div class="sparkle" style="top:70%;left:12%;font-size:0.8rem;animation-duration:2.8s;animation-delay:-1.2s;">✧</div>
-<div class="sparkle" style="top:25%;right:18%;font-size:1.3rem;animation-duration:4s;animation-delay:-0.7s;">✦</div>
-<div class="sparkle" style="top:75%;right:20%;font-size:0.9rem;animation-duration:2.5s;animation-delay:-2s;">✧</div>
-<div class="sparkle" style="top:45%;left:6%;font-size:0.7rem;animation-duration:3.6s;animation-delay:-1.8s;">⋆</div>
-<div class="sparkle" style="top:55%;right:8%;font-size:0.7rem;animation-duration:3s;animation-delay:-0.4s;">⋆</div>
+<!-- Click ripple -->
+<div class="click-ripple" id="click-ripple"></div>
 
-<div class="page-wrap">
+<div class="page">
 
   <!-- Headline -->
-  <div class="headline-wrap">
-    <p class="eyebrow">🌸 your wellness companion</p>
-    <h1>How are you feeling<br/><span>today?</span></h1>
-    <p class="sub">Choose an emotion and I'll find something to help&nbsp;💙</p>
+  <div class="headline" id="headline">
+    <p class="eyebrow" id="eyebrow">✦ your wellness companion ✦</p>
+    <h1 id="h1-text">How are you feeling<br/><em>today?</em></h1>
+    <p class="sub" id="sub-text">Choose an emotion — I'll find something to help&nbsp;💙</p>
   </div>
 
   <!-- Orbital scene -->
   <div class="scene" id="scene">
 
-    <!-- Orbit rings (decorative) -->
-    <div class="orbit-ring"></div>
-    <div class="orbit-ring"></div>
+    <!-- Orbit decoration ring -->
+    <div class="orbit-ring" id="orbit-ring"></div>
 
-    <!-- Mascot glow -->
-    <div class="glow-ring"></div>
+    <!-- Mascot aura / glow -->
+    <div class="mascot-aura" id="mascot-aura"></div>
 
-    <!-- Mascot SVG -->
+    <!-- Mascot -->
     <div class="mascot-wrap" id="mascot">
       <svg class="mascot-svg" viewBox="0 0 200 210" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- Shadow -->
-        <ellipse cx="100" cy="200" rx="52" ry="10" fill="rgba(178,80,130,0.12)"/>
-
+        <ellipse cx="100" cy="200" rx="50" ry="9" fill="rgba(178,80,130,0.1)"/>
         <!-- Body -->
         <circle cx="100" cy="100" r="76" fill="url(#bodyG)"/>
-        <!-- Belly patch -->
-        <ellipse cx="100" cy="115" rx="36" ry="30" fill="rgba(255,255,255,0.35)"/>
-
+        <!-- Belly -->
+        <ellipse cx="100" cy="114" rx="34" ry="29" fill="rgba(255,255,255,0.32)"/>
         <!-- Ears -->
         <ellipse cx="34"  cy="54" rx="20" ry="26" fill="url(#earG)"/>
         <ellipse cx="166" cy="54" rx="20" ry="26" fill="url(#earG)"/>
-        <ellipse cx="34"  cy="56" rx="10" ry="15" fill="#FFB3C6" opacity="0.7"/>
-        <ellipse cx="166" cy="56" rx="10" ry="15" fill="#FFB3C6" opacity="0.7"/>
-
+        <ellipse cx="34"  cy="56" rx="10" ry="15" fill="#FFB3C6" opacity="0.72"/>
+        <ellipse cx="166" cy="56" rx="10" ry="15" fill="#FFB3C6" opacity="0.72"/>
         <!-- Eye whites -->
         <ellipse cx="76"  cy="90" rx="17" ry="19" fill="white"/>
         <ellipse cx="124" cy="90" rx="17" ry="19" fill="white"/>
-
         <!-- Irises -->
-        <circle cx="76"  cy="92" r="11" fill="#3D2C35"/>
-        <circle cx="124" cy="92" r="11" fill="#3D2C35"/>
-
-        <!-- Pupils shine -->
-        <circle cx="80"  cy="87" r="4.5" fill="white"/>
-        <circle cx="128" cy="87" r="4.5" fill="white"/>
-        <circle cx="73"  cy="95" r="2"   fill="white" opacity="0.6"/>
-        <circle cx="121" cy="95" r="2"   fill="white" opacity="0.6"/>
-
-        <!-- Blush cheeks -->
-        <ellipse cx="56"  cy="112" rx="16" ry="10" fill="#FFB3C6" opacity="0.5"/>
-        <ellipse cx="144" cy="112" rx="16" ry="10" fill="#FFB3C6" opacity="0.5"/>
-
+        <circle  cx="76"  cy="92" r="11" fill="#3D2C35"/>
+        <circle  cx="124" cy="92" r="11" fill="#3D2C35"/>
+        <!-- Shines -->
+        <circle  cx="80"  cy="87" r="4.5" fill="white"/>
+        <circle  cx="128" cy="87" r="4.5" fill="white"/>
+        <circle  cx="73"  cy="95" r="2"   fill="white" opacity="0.55"/>
+        <circle  cx="121" cy="95" r="2"   fill="white" opacity="0.55"/>
+        <!-- Blush -->
+        <ellipse cx="56"  cy="112" rx="15" ry="9"  fill="#FFB3C6" opacity="0.48"/>
+        <ellipse cx="144" cy="112" rx="15" ry="9"  fill="#FFB3C6" opacity="0.48"/>
+        <!-- Nose -->
+        <ellipse cx="100" cy="107" rx="5" ry="3.5" fill="#3D2C35" opacity="0.45"/>
         <!-- Smile -->
-        <path d="M 78 115 Q 100 136 122 115" stroke="#3D2C35" stroke-width="4" stroke-linecap="round" fill="none"/>
-
-        <!-- Tiny nose -->
-        <ellipse cx="100" cy="107" rx="5" ry="3.5" fill="#3D2C35" opacity="0.5"/>
-
-        <!-- Heart sparkle -->
-        <text x="93" y="68" font-size="16" text-anchor="middle" opacity="0.9">💕</text>
-
-        <!-- Tiny stars around -->
-        <text x="28"  y="95"  font-size="10" opacity="0.6">✦</text>
-        <text x="162" y="88"  font-size="10" opacity="0.6">✦</text>
-        <text x="100" y="185" font-size="9"  opacity="0.4">✧</text>
-
+        <path d="M 78 115 Q 100 136 122 115" stroke="#3D2C35" stroke-width="3.8" stroke-linecap="round" fill="none"/>
+        <!-- Heart -->
+        <text x="93" y="68" font-size="15" text-anchor="middle" opacity="0.88">💕</text>
+        <!-- Stars -->
+        <text x="29"  y="95"  font-size="9"  opacity="0.55">✦</text>
+        <text x="162" y="88"  font-size="9"  opacity="0.55">✦</text>
         <defs>
           <radialGradient id="bodyG" cx="38%" cy="30%" r="70%">
             <stop offset="0%"   stop-color="#FFEEF5"/>
@@ -374,147 +311,272 @@
       </svg>
     </div>
 
-    <!-- Emotion buttons (positioned by JS) -->
-    <a class="emotion-btn" id="btn-angry"    href="{% url 'wellness:recommendations' 'angry' %}"    style="animation-delay:0.6s">
-      <div class="btn-pill btn-angry">
-        <span class="btn-emoji">😤</span>
-        <span class="btn-label">Angry</span>
-      </div>
+    <!-- Emotion buttons -->
+    <a class="emotion-btn" id="btn-angry"    data-emotion="angry"    href="{% url 'wellness:recommendations' 'angry' %}">
+      <div class="btn-pill btn-angry">   <span class="btn-emoji">😤</span><span>Angry</span>    </div>
       <div class="orbit-dot" style="background:#FF7A7A;"></div>
     </a>
-
-    <a class="emotion-btn" id="btn-anxious"  href="{% url 'wellness:recommendations' 'anxious' %}"  style="animation-delay:0.8s">
-      <div class="btn-pill btn-anxious">
-        <span class="btn-emoji">😰</span>
-        <span class="btn-label">Anxious</span>
-      </div>
+    <a class="emotion-btn" id="btn-anxious"  data-emotion="anxious"  href="{% url 'wellness:recommendations' 'anxious' %}">
+      <div class="btn-pill btn-anxious"> <span class="btn-emoji">😰</span><span>Anxious</span>  </div>
       <div class="orbit-dot" style="background:#4DD0E1;"></div>
     </a>
-
-    <a class="emotion-btn" id="btn-stressed" href="{% url 'wellness:recommendations' 'stressed' %}" style="animation-delay:1.0s">
-      <div class="btn-pill btn-stressed">
-        <span class="btn-emoji">😩</span>
-        <span class="btn-label">Stressed</span>
-      </div>
+    <a class="emotion-btn" id="btn-stressed" data-emotion="stressed" href="{% url 'wellness:recommendations' 'stressed' %}">
+      <div class="btn-pill btn-stressed"><span class="btn-emoji">😩</span><span>Stressed</span> </div>
       <div class="orbit-dot" style="background:#81C784;"></div>
     </a>
-
-    <a class="emotion-btn" id="btn-restless" href="{% url 'wellness:recommendations' 'restless' %}" style="animation-delay:1.2s">
-      <div class="btn-pill btn-restless">
-        <span class="btn-emoji">😶</span>
-        <span class="btn-label">Restless</span>
-      </div>
+    <a class="emotion-btn" id="btn-restless" data-emotion="restless" href="{% url 'wellness:recommendations' 'restless' %}">
+      <div class="btn-pill btn-restless"><span class="btn-emoji">😶</span><span>Restless</span> </div>
       <div class="orbit-dot" style="background:#FFD54F;"></div>
     </a>
-
   </div><!-- /scene -->
 
-  <!-- Footer note -->
-  <p class="footer-note">
-    This tool is for emotional support only &amp; is not a substitute for professional care.<br/>
-    If you're in crisis, please <a href="https://www.who.int/news-room/fact-sheets/detail/mental-health-strengthening-our-response" target="_blank">reach out to a professional</a>. 💙
+  <p class="footer-note" id="footer-note">
+    A supportive tool — not a replacement for professional mental health care.<br/>
+    If you're in crisis, please reach out to a qualified professional. 💙
   </p>
 
-</div>
+</div><!-- /page -->
 
-<!-- Click ripple overlay -->
-<div class="ripple-wrap" id="rippleWrap">
-  <div class="ripple" id="rippleEl"></div>
-</div>
-
-{% endblock %}
-
-{% block extra_scripts %}
 <script>
+// ─── Register GSAP plugin ───────────────────────────────────────────────────
+gsap.registerPlugin(MotionPathPlugin);
+
+// ─── 1. INTRO ANIMATION ─────────────────────────────────────────────────────
+const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+// Set initial states
+gsap.set(['#eyebrow','#h1-text','#sub-text'], { autoAlpha: 0, y: -20 });
+gsap.set('#mascot',        { autoAlpha: 0, scale: 0.7 });
+gsap.set('#mascot-aura',   { autoAlpha: 0, scale: 0.5 });
+gsap.set('#orbit-ring',    { autoAlpha: 0, scale: 0.6, rotation: -30, transformOrigin: '50% 50%' });
+gsap.set('.emotion-btn',   { autoAlpha: 0, scale: 0 });
+gsap.set('#footer-note',   { autoAlpha: 0, y: 10 });
+
+tl
+  .to('#eyebrow',      { autoAlpha: 1, y: 0, duration: 0.6 })
+  .to('#h1-text',      { autoAlpha: 1, y: 0, duration: 0.65 }, '-=0.35')
+  .to('#sub-text',     { autoAlpha: 1, y: 0, duration: 0.5 },  '-=0.3')
+  .to('#orbit-ring',   { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.9, ease: 'back.out(1.4)' }, '-=0.2')
+  .to('#mascot-aura',  { autoAlpha: 1, scale: 1, duration: 0.7, ease: 'power2.out' }, '-=0.5')
+  .to('#mascot',       { autoAlpha: 1, scale: 1, duration: 0.8, ease: 'back.out(1.6)' }, '-=0.4')
+  .to('.emotion-btn',  { autoAlpha: 1, scale: 1, duration: 0.5, ease: 'back.out(2)', stagger: 0.12 }, '-=0.2')
+  .to('#footer-note',  { autoAlpha: 1, y: 0, duration: 0.5 }, '-=0.1');
+
+
+// ─── 2. MASCOT: FLOAT UP AND DOWN ───────────────────────────────────────────
+gsap.to('#mascot', {
+  y: -14,
+  duration: 2.8,
+  ease: 'sine.inOut',
+  yoyo: true,
+  repeat: -1,
+});
+
+// Aura pulses in sync (slightly different timing = breathing feel)
+gsap.to('#mascot-aura', {
+  scale: 1.18,
+  opacity: 0.5,
+  duration: 2.4,
+  ease: 'sine.inOut',
+  yoyo: true,
+  repeat: -1,
+});
+
+// Orbit ring slow rotation
+gsap.to('#orbit-ring', {
+  rotation: 360,
+  duration: 32,
+  ease: 'none',
+  repeat: -1,
+  transformOrigin: '50% 50%',
+});
+
+
+// ─── 3. EMOTION BUTTONS: ORBITAL FLOAT ──────────────────────────────────────
+// Each button orbits independently around the scene center using sin/cos offsets
+// combined with GSAP timelines so they drift naturally — not mechanically.
+
+const scene  = document.getElementById('scene');
+const buttons = [
+  { el: document.getElementById('btn-angry'),    angle: 0,              rx: 0.38, ry: 0.30, speed: 14, floatAmp: 8,  floatPer: 3.2 },
+  { el: document.getElementById('btn-anxious'),  angle: Math.PI / 2,    rx: 0.40, ry: 0.28, speed: 18, floatAmp: 10, floatPer: 3.8 },
+  { el: document.getElementById('btn-stressed'), angle: Math.PI,        rx: 0.38, ry: 0.30, speed: 16, floatAmp: 7,  floatPer: 2.9 },
+  { el: document.getElementById('btn-restless'), angle: Math.PI * 1.5,  rx: 0.40, ry: 0.28, speed: 20, floatAmp: 9,  floatPer: 3.5 },
+];
+
+// Individual floats for each button (independent vertical drift)
+buttons.forEach(cfg => {
+  gsap.to(cfg.el, {
+    y: `+=${cfg.floatAmp}`,
+    duration: cfg.floatPer,
+    ease: 'sine.inOut',
+    yoyo: true,
+    repeat: -1,
+  });
+});
+
+// rAF-based orbital positioning (GSAP handles the float offset above)
+let paused = {};
+buttons.forEach(cfg => {
+  cfg.el.addEventListener('mouseenter', () => { paused[cfg.el.id] = true; });
+  cfg.el.addEventListener('mouseleave', () => { paused[cfg.el.id] = false; });
+});
+
+let lastTime = null;
+function orbitTick(ts) {
+  if (!lastTime) lastTime = ts;
+  const dt = (ts - lastTime) / 1000;
+  lastTime = ts;
+
+  const W  = scene.offsetWidth;
+  const H  = scene.offsetHeight;
+  const cx = W / 2;
+  const cy = H / 2;
+
+  buttons.forEach(cfg => {
+    if (!paused[cfg.el.id]) {
+      cfg.angle += (2 * Math.PI) / cfg.speed * dt;
+    }
+    const x = cx + cx * cfg.rx * 2 * Math.cos(cfg.angle);
+    const y = cy + cy * cfg.ry * 2 * Math.sin(cfg.angle);
+    cfg.el.style.left = (x - cfg.el.offsetWidth  / 2) + 'px';
+    cfg.el.style.top  = (y - cfg.el.offsetHeight / 2) + 'px';
+  });
+
+  requestAnimationFrame(orbitTick);
+}
+requestAnimationFrame(orbitTick);
+
+// Hover: pop scale up with GSAP spring
+buttons.forEach(cfg => {
+  cfg.el.addEventListener('mouseenter', () => {
+    gsap.to(cfg.el, { scale: 1.15, duration: 0.3, ease: 'back.out(2.5)' });
+  });
+  cfg.el.addEventListener('mouseleave', () => {
+    gsap.to(cfg.el, { scale: 1, duration: 0.35, ease: 'elastic.out(1,0.5)' });
+  });
+});
+
+
+// ─── 4. PARTICLE BACKGROUND ─────────────────────────────────────────────────
 (function() {
-  /* ─── Orbital positioning ─── */
-  const scene   = document.getElementById('scene');
-  const buttons = [
-    document.getElementById('btn-angry'),
-    document.getElementById('btn-anxious'),
-    document.getElementById('btn-stressed'),
-    document.getElementById('btn-restless'),
-  ];
+  const canvas = document.getElementById('particle-canvas');
+  const ctx    = canvas.getContext('2d');
+  let   W, H;
 
-  // Each button orbits at its own radius + speed with a phase offset
-  const configs = [
-    { radius: 0.40, speed: 0.00022, phase: Math.PI * 0.10, floatAmp: 7,  floatFreq: 0.0008 },
-    { radius: 0.38, speed: 0.00019, phase: Math.PI * 1.10, floatAmp: 9,  floatFreq: 0.0011 },
-    { radius: 0.42, speed: 0.00025, phase: Math.PI * 0.65, floatAmp: 6,  floatFreq: 0.0009 },
-    { radius: 0.39, speed: 0.00021, phase: Math.PI * 1.65, floatAmp: 8,  floatFreq: 0.0007 },
-  ];
+  const COLORS = ['#FFB3C6','#B5EAD7','#FFD1A9','#D4B8E0','#AED9E0','#FFF1A8'];
+  const COUNT  = 38;
 
-  // Pause orbit on hover, resume on leave
-  let paused = [false, false, false, false];
-  buttons.forEach((btn, i) => {
-    btn.addEventListener('mouseenter', () => { paused[i] = true;  });
-    btn.addEventListener('mouseleave', () => { paused[i] = false; });
-  });
-
-  let last = null;
-  function tick(ts) {
-    if (!last) last = ts;
-    const dt = ts - last;
-    last = ts;
-
-    const W = scene.offsetWidth;
-    const H = scene.offsetHeight;
-    const cx = W / 2, cy = H / 2;
-
-    buttons.forEach((btn, i) => {
-      const cfg = configs[i];
-      if (!paused[i]) cfg.phase += cfg.speed * dt;
-
-      const rx = cx * cfg.radius * 1.9;
-      const ry = cy * cfg.radius * 1.0;
-      const x  = cx + rx * Math.cos(cfg.phase);
-      const y  = cy + ry * Math.sin(cfg.phase) + Math.sin(ts * cfg.floatFreq) * cfg.floatAmp;
-
-      // Centre the button on (x, y)
-      const bw = btn.offsetWidth  / 2;
-      const bh = btn.offsetHeight / 2;
-      btn.style.left = (x - bw) + 'px';
-      btn.style.top  = (y - bh) + 'px';
-    });
-
-    requestAnimationFrame(tick);
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
   }
-  requestAnimationFrame(tick);
+  window.addEventListener('resize', resize);
+  resize();
 
-  /* ─── Ripple on emotion click ─── */
-  const rippleWrap = document.getElementById('rippleWrap');
-  const rippleEl   = document.getElementById('rippleEl');
+  // Build particles
+  const particles = Array.from({ length: COUNT }, () => ({
+    x:     Math.random() * W,
+    y:     Math.random() * H,
+    r:     Math.random() * 4 + 1.5,
+    vx:    (Math.random() - 0.5) * 0.25,
+    vy:   -(Math.random() * 0.3 + 0.08),
+    alpha: Math.random() * 0.35 + 0.1,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    wobble:      Math.random() * Math.PI * 2,
+    wobbleSpeed: Math.random() * 0.015 + 0.005,
+  }));
 
-  const rippleColors = {
-    'btn-angry':    '#FFAB91',
-    'btn-anxious':  '#80DEEA',
-    'btn-stressed': '#A5D6A7',
-    'btn-restless': '#FFE082',
-  };
+  function drawParticles() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => {
+      p.wobble += p.wobbleSpeed;
+      p.x += p.vx + Math.sin(p.wobble) * 0.18;
+      p.y += p.vy;
+      if (p.y < -10)       { p.y = H + 10; p.x = Math.random() * W; }
+      if (p.x < -10)       p.x = W + 10;
+      if (p.x > W + 10)    p.x = -10;
 
-  buttons.forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      const pill = btn.querySelector('.btn-pill');
-      const cls  = [...pill.classList].find(c => rippleColors[c]);
-      rippleEl.style.background = rippleColors[cls] || '#FFB3C6';
-      rippleEl.style.animation  = 'none';
-      void rippleEl.offsetWidth; // reflow
-      rippleEl.style.animation  = 'rippleOut 0.65s ease-out forwards';
-      rippleWrap.classList.add('active');
-      setTimeout(() => rippleWrap.classList.remove('active'), 700);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha * (0.75 + 0.25 * Math.sin(p.wobble));
+      ctx.fill();
     });
-  });
-
-  /* ─── Parallax mascot on mouse move ─── */
-  const mascot = document.getElementById('mascot');
-  document.addEventListener('mousemove', e => {
-    const px = (e.clientX / window.innerWidth  - 0.5) * 10;
-    const py = (e.clientY / window.innerHeight - 0.5) * 6;
-    mascot.style.setProperty('--px', px + 'px');
-    mascot.style.setProperty('--py', py + 'px');
-    mascot.style.filter = `drop-shadow(${-px*0.4}px ${-py*0.4}px 24px rgba(178,80,130,0.15))`;
-  });
-
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(drawParticles);
+  }
+  drawParticles();
 })();
+
+
+// ─── 5. PARALLAX MASCOT ON MOUSE MOVE ───────────────────────────────────────
+document.addEventListener('mousemove', e => {
+  const px = (e.clientX / window.innerWidth  - 0.5) * 12;
+  const py = (e.clientY / window.innerHeight - 0.5) * 7;
+  gsap.to('#mascot', {
+    x: px, y: -14 + py,  // -14 is the float offset
+    duration: 1.2, ease: 'power2.out',
+    overwrite: false,
+  });
+});
+
+
+// ─── 6. CLICK HANDLER: ripple + AJAX + redirect ──────────────────────────────
+const rippleEl = document.getElementById('click-ripple');
+const rippleColors = {
+  angry:    '#FFAB91',
+  anxious:  '#80DEEA',
+  stressed: '#A5D6A7',
+  restless: '#FFE082',
+};
+const loadingOverlay = document.getElementById('loading-overlay');
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+buttons.forEach(cfg => {
+  cfg.el.addEventListener('click', async function(e) {
+    e.preventDefault();
+
+    const emotion = cfg.el.dataset.emotion;
+
+    // Ripple
+    rippleEl.style.left       = e.clientX + 'px';
+    rippleEl.style.top        = e.clientY + 'px';
+    rippleEl.style.background = rippleColors[emotion] || '#FFB3C6';
+    gsap.fromTo(rippleEl,
+      { scale: 0, opacity: 0.75 },
+      { scale: 28, opacity: 0, duration: 0.7, ease: 'power2.out' }
+    );
+
+    // Button celebration pop
+    gsap.timeline()
+      .to(cfg.el, { scale: 1.3, duration: 0.15, ease: 'power2.out' })
+      .to(cfg.el, { scale: 0,   duration: 0.2,  ease: 'power2.in' });
+
+    // Show loading
+    loadingOverlay.classList.add('show');
+
+    // AJAX → backend → redirect
+    try {
+      const resp = await fetch("{% url 'wellness:select_emotion' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'X-CSRFToken':   CSRF_TOKEN,
+        },
+        body: JSON.stringify({ emotion }),
+      });
+      const data = await resp.json();
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else {
+        window.location.href = cfg.el.href;
+      }
+    } catch {
+      window.location.href = cfg.el.href;
+    }
+  });
+});
 </script>
-{% endblock %}
+</body>
+</html>

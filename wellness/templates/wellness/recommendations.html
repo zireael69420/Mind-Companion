@@ -1,229 +1,393 @@
-{% extends 'base.html' %}
+{% comment %}
+FILE: wellness/templates/wellness/recommendations.html
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mellow — Videos for when you feel {{ meta.label }}</title>
 
-{% block title %}Mellow — Videos for when you feel {{ config.label }}{% endblock %}
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
 
-{% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
+  <style>
+    :root { --ink:#3D2C35; --muted:#9B8EA0; --cream:#FFF8F0; }
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      min-height: 100vh;
+    }
 
-  <!-- Back button -->
-  <a href="{% url 'wellness:landing' %}" class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-6 font-body">
-    ← Choose a different feeling
-  </a>
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 55% at 15% 20%, #FFE4EC55 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 15%, #D4F5EC55 0%, transparent 55%),
+        radial-gradient(ellipse 55% 60% at 80% 85%, #E8D5F555 0%, transparent 60%),
+        var(--cream);
+    }
 
-  <!-- Emotion header -->
-  <div class="text-center mb-6 animate-fade-in">
-    <span class="text-6xl mb-3 block">{{ config.emoji }}</span>
-    <h1 class="font-display font-900 text-3xl text-gray-700">
-      Feeling <span style="color:{{ config.color }}">{{ config.label }}</span>
-    </h1>
-  </div>
+    .page-wrap { position: relative; z-index: 2; max-width: 960px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
 
-  <!-- AI message bubble -->
-  <div class="card rounded-3xl p-6 mb-8 max-w-2xl mx-auto shadow-md animate-slide-up text-center">
-    <div class="flex items-start gap-3 justify-center">
-      <span class="text-2xl flex-shrink-0 mt-0.5">🌸</span>
-      <p class="font-body text-gray-600 leading-relaxed text-base italic">
-        "{{ ai_message }}"
-      </p>
+    /* Nav */
+    .nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .back-link {
+      font-size: 0.82rem; color: var(--muted); text-decoration: none;
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--ink); }
+    .brand {
+      font-family: 'Baloo 2', sans-serif; font-weight: 800;
+      font-size: 1.1rem; color: #B25082; text-decoration: none;
+    }
+
+    /* Header */
+    .page-header { text-align: center; margin-bottom: 1rem; }
+    .emotion-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.7); border: 1.5px solid rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      padding: 8px 20px; border-radius: 999px;
+      font-family: 'Baloo 2', sans-serif; font-size: 1rem; font-weight: 700;
+      color: var(--ink); margin-bottom: 0.75rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    }
+    .page-title {
+      font-family: 'Baloo 2', sans-serif;
+      font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+      font-weight: 900; color: var(--ink); line-height: 1.15;
+    }
+    .page-subtitle { font-size: 0.88rem; color: var(--muted); margin-top: 0.4rem; font-style: italic; }
+
+    /* Video grid */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+      gap: 1.25rem;
+      margin: 1.5rem 0 2.5rem;
+    }
+
+    .video-card {
+      background: rgba(255,255,255,0.75);
+      border: 1.5px solid rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px; overflow: hidden;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.07);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .video-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.11);
+    }
+
+    /* Thumbnail container */
+    .thumb-wrap {
+      position: relative; cursor: pointer;
+      background: #f0e8f0; aspect-ratio: 16/9; overflow: hidden;
+    }
+    .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .play-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.18);
+      transition: background 0.2s;
+    }
+    .thumb-wrap:hover .play-overlay { background: rgba(0,0,0,0.28); }
+    .play-btn {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(255,255,255,0.92);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      transition: transform 0.2s;
+    }
+    .thumb-wrap:hover .play-btn { transform: scale(1.1); }
+    .play-icon {
+      width: 0; height: 0;
+      border-style: solid; border-width: 9px 0 9px 18px;
+      border-color: transparent transparent transparent #B25082;
+      margin-left: 3px;
+    }
+
+    /* Embed */
+    .embed-wrap { display: none; aspect-ratio: 16/9; }
+    .embed-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+
+    /* Video info */
+    .video-info { padding: 0.9rem 1rem 1rem; }
+    .video-title {
+      font-family: 'Baloo 2', sans-serif; font-weight: 700;
+      font-size: 0.88rem; color: var(--ink); line-height: 1.35;
+      margin-bottom: 0.25rem;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .video-channel { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── Rating section ── */
+    .rating-section {
+      background: rgba(255,255,255,0.8);
+      border: 1.5px solid rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px);
+      border-radius: 24px; padding: 2rem 1.5rem;
+      text-align: center; max-width: 500px; margin: 0 auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    .rating-mascot { font-size: 2.8rem; margin-bottom: 0.6rem; display: block; }
+    .rating-title {
+      font-family: 'Baloo 2', sans-serif; font-weight: 800;
+      font-size: 1.25rem; color: var(--ink); margin-bottom: 0.3rem;
+    }
+    .rating-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.25rem; font-style: italic; }
+
+    /* Stars */
+    .stars-row {
+      display: flex; justify-content: center; gap: 10px; margin-bottom: 1.25rem;
+    }
+    .star-btn {
+      font-size: 2.2rem; background: none; border: none; cursor: pointer;
+      color: #E0D0E0; line-height: 1;
+      transition: transform 0.15s, color 0.15s;
+      will-change: transform;
+    }
+    .star-btn:hover { transform: scale(1.2); }
+    .star-btn.lit    { color: #FBBF24; }
+    .star-btn.active { color: #F59E0B; }
+
+    .star-label {
+      font-family: 'Baloo 2', sans-serif; font-weight: 700;
+      font-size: 0.9rem; color: #B25082; min-height: 1.4em;
+      margin-bottom: 1rem; transition: opacity 0.2s;
+    }
+
+    .submit-btn {
+      font-family: 'Baloo 2', sans-serif; font-weight: 800;
+      font-size: 0.95rem; color: white;
+      background: linear-gradient(135deg, #FF6B9D, #FFA45C);
+      border: none; border-radius: 999px;
+      padding: 12px 32px; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255,107,157,0.35);
+      transition: transform 0.2s, box-shadow 0.2s;
+      opacity: 0.4; pointer-events: none;
+    }
+    .submit-btn.ready {
+      opacity: 1; pointer-events: all;
+    }
+    .submit-btn.ready:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(255,107,157,0.45);
+    }
+    .submit-btn.ready:active { transform: scale(0.97); }
+
+    /* Skip link */
+    .skip-link {
+      display: block; margin-top: 1rem;
+      font-size: 0.75rem; color: var(--muted); text-decoration: none;
+    }
+    .skip-link:hover { color: var(--ink); text-decoration: underline; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+      background: white; border-radius: 16px;
+      padding: 0.75rem 1.25rem;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.12);
+      display: flex; align-items: center; gap: 0.6rem;
+      font-size: 0.82rem; color: var(--ink);
+      opacity: 0; transform: translateY(12px);
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); pointer-events: all; }
+  </style>
+</head>
+<body>
+
+<div class="bg-mesh"></div>
+
+<!-- Toast -->
+<div id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
+
+<div class="page-wrap">
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a href="{% url 'wellness:landing' %}" class="back-link">← Back</a>
+    <a href="{% url 'wellness:landing' %}" class="brand">🌸 Mellow</a>
+    <span style="width:60px"></span>
+  </nav>
+
+  <!-- Header -->
+  <header class="page-header" id="page-header">
+    <div class="emotion-badge">
+      <span>{{ meta.emoji }}</span>
+      <span>Feeling {{ meta.label }}</span>
     </div>
-    <p class="text-xs text-gray-300 mt-3">— Mellow, your wellness companion</p>
-  </div>
+    <h1 class="page-title">Here's something to help&nbsp;💙</h1>
+    <p class="page-subtitle">Watch a video, breathe slowly, and be gentle with yourself.</p>
+  </header>
 
-  <!-- Videos section -->
-  <h2 class="font-display font-700 text-lg text-gray-600 mb-4 text-center">
-    🎬 Watch something helpful
-  </h2>
-
-  {% if videos %}
-  <div class="grid gap-5 sm:grid-cols-2 mb-10">
+  <!-- Video grid -->
+  <div class="video-grid" id="video-grid">
     {% for video in videos %}
-    <div class="video-card card rounded-2xl overflow-hidden shadow-md" data-video-db-id="{{ video.id|default:'' }}" data-video-yt-id="{{ video.youtube_video_id }}" data-video-title="{{ video.title }}">
+    <div class="video-card" id="vcard-{{ forloop.counter }}">
 
-      <!-- Thumbnail / Embed toggle -->
-      <div class="relative bg-gray-100 group cursor-pointer" onclick="loadEmbed(this, '{{ video.youtube_video_id }}')" id="thumb-{{ forloop.counter }}">
+      <!-- Thumbnail (click to embed) -->
+      <div class="thumb-wrap" onclick="loadVideo({{ forloop.counter }}, '{{ video.id }}')">
         <img
-          src="{{ video.thumbnail_url|default:'https://img.youtube.com/vi/'|add:video.youtube_video_id|add:'/mqdefault.jpg' }}"
+          src="{{ video.thumbnail }}"
           alt="{{ video.title }}"
-          class="w-full h-48 object-cover"
-          onerror="this.src='https://img.youtube.com/vi/{{ video.youtube_video_id }}/mqdefault.jpg'"
+          loading="lazy"
+          onerror="this.src='https://img.youtube.com/vi/{{ video.id }}/mqdefault.jpg'"
         />
-        <!-- Play button overlay -->
-        <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors rounded-t-2xl">
-          <div class="bg-white/90 rounded-full p-3 shadow-lg group-hover:scale-110 transition-transform">
-            <svg class="w-8 h-8 text-rose-400 ml-1" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          </div>
+        <div class="play-overlay">
+          <div class="play-btn"><div class="play-icon"></div></div>
         </div>
       </div>
 
-      <!-- Embed container (hidden by default) -->
-      <div id="embed-{{ forloop.counter }}" class="hidden">
+      <!-- Embed (hidden until play clicked) -->
+      <div class="embed-wrap" id="embed-{{ forloop.counter }}">
         <iframe
-          width="100%"
-          height="220"
+          id="iframe-{{ forloop.counter }}"
           src=""
-          data-src="{{ video.embed_url }}?autoplay=1&rel=0"
-          frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
-          class="w-full"
         ></iframe>
       </div>
 
-      <!-- Video info + rating -->
-      <div class="p-4">
-        <h3 class="font-display font-700 text-gray-700 text-sm leading-snug mb-3">{{ video.title }}</h3>
-
-        <!-- Star rating -->
-        <div class="flex items-center gap-1 mb-2" data-video-idx="{{ forloop.counter }}">
-          <span class="text-xs text-gray-400 mr-1 font-body">Rate:</span>
-          {% for star in "12345" %}
-          <button
-            class="star-btn inactive text-2xl leading-none"
-            data-star="{{ forloop.counter }}"
-            data-video-idx="{{ forloop.parentloop.counter }}"
-            onclick="handleStar(this)"
-            aria-label="{{ forloop.counter }} star"
-          >★</button>
-          {% endfor %}
-          <span class="text-xs text-gray-300 ml-1 star-label font-body"></span>
-        </div>
-
-        <!-- Optional feedback -->
-        <div class="feedback-area hidden mt-2">
-          <textarea
-            placeholder="Any thoughts? (optional)"
-            class="w-full text-xs rounded-xl border border-gray-100 bg-gray-50 p-2 resize-none focus:outline-none focus:ring-2 focus:ring-rose-200 font-body"
-            rows="2"
-          ></textarea>
-          <button
-            onclick="submitRating(this)"
-            data-video-idx="{{ forloop.counter }}"
-            data-video-db-id="{{ video.id|default:'' }}"
-            data-video-yt-id="{{ video.youtube_video_id }}"
-            data-video-title="{{ video.title }}"
-            class="mt-2 w-full text-xs font-display font-700 py-2 rounded-xl text-white transition-all"
-            style="background: {{ config.color }};"
-          >
-            Submit Rating ✨
-          </button>
-        </div>
-
-        <!-- Rated confirmation -->
-        <div class="rated-msg hidden text-xs text-green-500 font-body flex items-center gap-1 mt-1">
-          ✅ Thank you for rating!
-        </div>
+      <!-- Info -->
+      <div class="video-info">
+        <p class="video-title">{{ video.title }}</p>
+        <p class="video-channel">{{ video.channel }}</p>
       </div>
+    </div>
+    {% empty %}
+    <div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted);">
+      <p style="font-size:2rem;margin-bottom:0.5rem;">🎬</p>
+      <p>No videos found right now. Please try again shortly!</p>
     </div>
     {% endfor %}
   </div>
 
-  {% else %}
-  <div class="card rounded-2xl p-8 text-center text-gray-400 font-body">
-    <p class="text-3xl mb-2">🎬</p>
-    <p>No videos found right now. Please check back soon!</p>
+  <!-- ── Rating section ── -->
+  <div class="rating-section" id="rating-section">
+    <span class="rating-mascot">🌸</span>
+    <h2 class="rating-title">How helpful was this experience?</h2>
+    <p class="rating-sub">Your feedback helps us improve Mellow for everyone.</p>
+
+    <!-- Stars -->
+    <div class="stars-row" id="stars-row">
+      {% for i in "12345" %}
+      <button class="star-btn" data-val="{{ forloop.counter }}" onclick="selectStar({{ forloop.counter }})" aria-label="{{ forloop.counter }} star">★</button>
+      {% endfor %}
+    </div>
+
+    <p class="star-label" id="star-label">&nbsp;</p>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitRating()">
+      Submit Rating ✨
+    </button>
+
+    <a href="{% url 'wellness:landing' %}" class="skip-link">Skip — return home</a>
   </div>
-  {% endif %}
 
-  <!-- Done button -->
-  <div class="text-center mt-4">
-    <a href="{% url 'wellness:thank_you' %}?emotion={{ emotion }}"
-       class="inline-block font-display font-700 px-8 py-3 rounded-full text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
-       style="background: linear-gradient(135deg, {{ config.color }}, #FF90C2);">
-      I'm done watching 🌸
-    </a>
-  </div>
+</div><!-- /page-wrap -->
 
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
 <script>
-  const SESSION_ID = "{{ session_id }}";
-  const EMOTION = "{{ emotion }}";
-  const CSRF_TOKEN = "{{ csrf_token }}";
-  let selectedStars = {};   // { videoIdx: starCount }
+const EMOTION   = '{{ emotion }}';
+const VIDEO_IDS = '{{ video_ids }}';
+const CSRF      = '{{ csrf_token }}';
 
-  function loadEmbed(thumbEl, ytId) {
-    const idx = thumbEl.id.replace('thumb-', '');
-    const embedContainer = document.getElementById('embed-' + idx);
-    const iframe = embedContainer.querySelector('iframe');
-    iframe.src = iframe.dataset.src;
-    thumbEl.classList.add('hidden');
-    embedContainer.classList.remove('hidden');
-  }
+// ── Intro animations ─────────────────────────────────────────────────────────
+gsap.set(['#page-header','#video-grid','.video-card','#rating-section'], { autoAlpha: 0, y: 20 });
+const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+tl.to('#page-header',    { autoAlpha: 1, y: 0, duration: 0.55 })
+  .to('.video-card',     { autoAlpha: 1, y: 0, duration: 0.45, stagger: 0.08 }, '-=0.2')
+  .to('#video-grid',     { autoAlpha: 1, y: 0, duration: 0.01 }, '<')
+  .to('#rating-section', { autoAlpha: 1, y: 0, duration: 0.5 }, '-=0.1');
 
-  function handleStar(btn) {
-    const star = parseInt(btn.dataset.star);
-    const vidIdx = btn.dataset.videoIdx;
-    selectedStars[vidIdx] = star;
+// ── Video embed loader ────────────────────────────────────────────────────────
+function loadVideo(idx, ytId) {
+  const thumbWrap = document.querySelector(`#vcard-${idx} .thumb-wrap`);
+  const embedWrap = document.getElementById(`embed-${idx}`);
+  const iframe    = document.getElementById(`iframe-${idx}`);
 
-    // Update visual
-    const container = btn.closest('[data-video-idx]');
-    const stars = container.querySelectorAll('.star-btn');
-    stars.forEach((s, i) => {
-      if (i < star) {
-        s.classList.add('active');
-        s.classList.remove('inactive');
-      } else {
-        s.classList.remove('active');
-        s.classList.add('inactive');
-      }
-    });
+  iframe.src  = `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1`;
+  thumbWrap.style.display = 'none';
+  embedWrap.style.display = 'block';
 
-    const label = container.querySelector('.star-label');
-    const labels = ['', 'Not helpful', 'Slightly helpful', 'Helpful', 'Very helpful', 'Amazing!'];
-    label.textContent = labels[star] || '';
+  gsap.from(embedWrap, { opacity: 0, duration: 0.4, ease: 'power2.out' });
+}
 
-    // Show feedback area
-    const card = btn.closest('.video-card');
-    card.querySelector('.feedback-area').classList.remove('hidden');
-  }
+// ── Star rating ───────────────────────────────────────────────────────────────
+let selectedRating = 0;
+const STAR_LABELS  = ['', 'Not helpful', 'Slightly helpful', 'Helpful', 'Very helpful', 'Amazing! 🌟'];
 
-  async function submitRating(btn) {
-    const vidIdx = btn.dataset.videoIdx;
-    const stars = selectedStars[vidIdx] || 0;
-    const card = btn.closest('.video-card');
-    const feedback = card.querySelector('textarea').value;
+function selectStar(val) {
+  selectedRating = val;
+  const stars = document.querySelectorAll('.star-btn');
 
-    const payload = {
-      stars,
-      emotion: EMOTION,
-      video_id: btn.dataset.videoDbId || null,
-      youtube_video_id: btn.dataset.videoYtId,
-      title: btn.dataset.videoTitle,
-      session_id: SESSION_ID,
-      feedback,
-    };
-
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
-
-    try {
-      const resp = await fetch("{% url 'wellness:submit_rating' %}", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF_TOKEN,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json();
-      if (data.success) {
-        card.querySelector('.feedback-area').classList.add('hidden');
-        card.querySelector('.rated-msg').classList.remove('hidden');
-        showToast('Rating saved! Thank you 💙', '⭐');
-      } else {
-        showToast('Oops, something went wrong.', '❌');
-        btn.disabled = false;
-        btn.textContent = 'Submit Rating ✨';
-      }
-    } catch {
-      showToast('Network error. Please try again.', '❌');
-      btn.disabled = false;
-      btn.textContent = 'Submit Rating ✨';
+  stars.forEach((s, i) => {
+    const active = i < val;
+    s.classList.toggle('lit',    active);
+    s.classList.toggle('active', i === val - 1);
+    if (active) {
+      gsap.fromTo(s, { scale: 1.3 }, { scale: 1, duration: 0.35, ease: 'elastic.out(1,0.5)' });
     }
+  });
+
+  document.getElementById('star-label').textContent = STAR_LABELS[val] || '';
+
+  const btn = document.getElementById('submit-btn');
+  btn.classList.add('ready');
+  gsap.fromTo(btn, { scale: 0.95 }, { scale: 1, duration: 0.3, ease: 'back.out(2)' });
+}
+
+// ── Submit rating via AJAX ────────────────────────────────────────────────────
+async function submitRating() {
+  if (!selectedRating) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = 'Saving…';
+  btn.classList.remove('ready');
+
+  try {
+    const resp = await fetch("{% url 'wellness:submit_rating' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({
+        emotion:   EMOTION,
+        rating:    selectedRating,
+        video_ids: VIDEO_IDS,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success && data.redirect_url) {
+      showToast('Rating saved! Thank you 💙', '⭐');
+      setTimeout(() => { window.location.href = data.redirect_url; }, 900);
+    } else {
+      showToast('Something went wrong. Please try again.', '❌');
+      btn.textContent = 'Submit Rating ✨';
+      btn.classList.add('ready');
+    }
+  } catch {
+    showToast('Network error. Please try again.', '❌');
+    btn.textContent = 'Submit Rating ✨';
+    btn.classList.add('ready');
   }
+}
+
+// ── Toast helper ─────────────────────────────────────────────────────────────
+function showToast(msg, icon) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-icon').textContent = icon;
+  document.getElementById('toast-msg').textContent  = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
 </script>
-{% endblock %}
+</body>
+</html>

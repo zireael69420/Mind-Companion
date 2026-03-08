@@ -1,79 +1,109 @@
-import json
-import os
-import random
-import requests
+# wellness/views.py
 
+import json
+import logging
+import os
+
+import requests
 from django.conf import settings
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_POST
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
-from .models import VideoRecommendation, WellnessSession, VideoRating
+from .models import WellnessRating
 
-EMOTION_CONFIG = {
+logger = logging.getLogger(__name__)
+
+# ── Emotion meta ──────────────────────────────────────────────────────────────
+
+EMOTION_META = {
     'angry': {
-        'label': 'Angry',
-        'emoji': '😤',
-        'color': '#FF6B6B',
-        'search_query': 'calming anger management meditation',
-        'message_hint': 'feeling angry and need to calm down',
-        'fallback_videos': [
-            {'id': 'MIr3RsUWrdo', 'title': 'Anger Management Meditation'},
-            {'id': 'z6X5oEIg6Ak', 'title': 'Calm Your Anger - Breathing Exercise'},
-            {'id': 'aXItOY0sLRY', 'title': 'Release Anger - Guided Meditation'},
-        ]
+        'label':  'Angry',
+        'emoji':  '😤',
+        'color':  '#FF8A80',
+        'bg':     'from-red-50 to-orange-50',
+        'accent': 'bg-red-400',
     },
     'anxious': {
-        'label': 'Anxious',
-        'emoji': '😰',
-        'color': '#4ECDC4',
-        'search_query': 'anxiety relief calming meditation breathing',
-        'message_hint': 'feeling anxious and overwhelmed',
-        'fallback_videos': [
-            {'id': 'O-6f5wQXSu8', 'title': 'Anti-Anxiety Breathing Exercise'},
-            {'id': 'yst0hhBEfzA', 'title': 'Anxiety Relief Meditation'},
-            {'id': 'ZToicYcHIOU', 'title': '5 Minute Anxiety Meditation'},
-        ]
+        'label':  'Anxious',
+        'emoji':  '😰',
+        'color':  '#4DD0E1',
+        'bg':     'from-cyan-50 to-teal-50',
+        'accent': 'bg-cyan-400',
     },
     'stressed': {
-        'label': 'Stressed',
-        'emoji': '😩',
-        'color': '#A8E6CF',
-        'search_query': 'stress relief relaxation meditation music',
-        'message_hint': 'feeling very stressed and burned out',
-        'fallback_videos': [
-            {'id': '4EaMJOo1jks', 'title': 'Stress Relief Meditation'},
-            {'id': 'mMHkLR5JCAI', 'title': 'Relaxing Music for Stress'},
-            {'id': 'ODfWtnECwdU', 'title': '10 Minute Stress Relief'},
-        ]
+        'label':  'Stressed',
+        'emoji':  '😩',
+        'color':  '#81C784',
+        'bg':     'from-green-50 to-emerald-50',
+        'accent': 'bg-green-400',
     },
     'restless': {
-        'label': 'Restless',
-        'emoji': '😶',
-        'color': '#FFD93D',
-        'search_query': 'sleep relaxation calm restless mind meditation',
-        'message_hint': 'feeling restless and unable to settle',
-        'fallback_videos': [
-            {'id': 'inpok4MKVLM', 'title': 'Calm Restless Mind Meditation'},
-            {'id': '1ZYbU82uLEk', 'title': 'Deep Sleep Relaxation'},
-            {'id': 'lFcSrYw2VjY', 'title': 'Peaceful Music for Restlessness'},
-        ]
+        'label':  'Restless',
+        'emoji':  '😶',
+        'color':  '#FFD54F',
+        'bg':     'from-yellow-50 to-amber-50',
+        'accent': 'bg-yellow-400',
     },
 }
 
+# ── Hardcoded fallback videos (used when APIs are unavailable) ─────────────────
 
-def get_ai_message(emotion):
-    """Generate a compassionate AI message using Anthropic API."""
-    api_key = settings.ANTHROPIC_API_KEY
+FALLBACK_VIDEOS = {
+    'angry': [
+        {'id': 'MIr3RsUWrdo', 'title': 'Anger Release Meditation — Let Go of Anger', 'channel': 'Goodful'},
+        {'id': 'z6X5oEIg6Ak', 'title': '5-Minute Breathing Exercise to Calm Anger',  'channel': 'Headspace'},
+        {'id': 'aXItOY0sLRY', 'title': 'Release Anger Guided Meditation',             'channel': 'The Honest Guys'},
+        {'id': 'inpok4MKVLM', 'title': '10-Minute Mindfulness for Anger',             'channel': 'Goodful'},
+        {'id': 'O-6f5wQXSu8', 'title': 'Progressive Muscle Relaxation for Anger',     'channel': 'Psych2Go'},
+    ],
+    'anxious': [
+        {'id': 'O-6f5wQXSu8', 'title': '4-7-8 Breathing for Anxiety Relief',          'channel': 'Headspace'},
+        {'id': 'yst0hhBEfzA', 'title': 'Anxiety Relief — Calm Your Mind Meditation',  'channel': 'Goodful'},
+        {'id': 'ZToicYcHIOU', 'title': '5-Minute Meditation for Anxiety',              'channel': 'Great Meditation'},
+        {'id': 'MIr3RsUWrdo', 'title': 'Guided Visualization for Anxiety',             'channel': 'The Honest Guys'},
+        {'id': '4EaMJOo1jks', 'title': 'Anxiety & Stress Relief Music',                'channel': 'Yellow Brick Cinema'},
+    ],
+    'stressed': [
+        {'id': '4EaMJOo1jks', 'title': 'Stress Relief Meditation — Calm Your Mind',   'channel': 'Goodful'},
+        {'id': 'mMHkLR5JCAI', 'title': 'Relaxing Music for Stress Relief',             'channel': 'Yellow Brick Cinema'},
+        {'id': 'ODfWtnECwdU', 'title': '10-Minute Body Scan for Stress',               'channel': 'Headspace'},
+        {'id': 'inpok4MKVLM', 'title': 'Progressive Relaxation — Full Body Release',  'channel': 'The Honest Guys'},
+        {'id': 'yst0hhBEfzA', 'title': 'Deep Breathing Exercises to Reduce Stress',   'channel': 'Psych2Go'},
+    ],
+    'restless': [
+        {'id': 'inpok4MKVLM', 'title': 'Calm a Restless Mind — Guided Meditation',    'channel': 'Goodful'},
+        {'id': '1ZYbU82uLEk', 'title': 'Deep Sleep Music — Quiet a Restless Mind',    'channel': 'Yellow Brick Cinema'},
+        {'id': 'lFcSrYw2VjY', 'title': 'Peaceful Nature Sounds for Restlessness',     'channel': 'Relaxing White Noise'},
+        {'id': 'O-6f5wQXSu8', 'title': 'Body Scan Meditation for Restless Energy',    'channel': 'Headspace'},
+        {'id': 'MIr3RsUWrdo', 'title': 'Wind-Down Yoga for Restless Feelings',        'channel': 'Yoga with Adriene'},
+    ],
+}
+
+
+# ── AI: generate YouTube search queries via Claude ────────────────────────────
+
+def get_ai_search_queries(emotion: str) -> list[str]:
+    """
+    Ask Claude to generate 3 YouTube search queries for the given emotion.
+    Returns a list of query strings, or falls back to defaults.
+    """
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
-        return _default_message(emotion)
+        return _default_queries(emotion)
 
-    config = EMOTION_CONFIG.get(emotion, {})
-    hint = config.get('message_hint', f'feeling {emotion}')
+    prompt = (
+        f'A user is feeling {emotion}. Generate exactly 3 short YouTube search queries '
+        f'(each under 8 words) to find calming, helpful mental wellness videos for someone '
+        f'experiencing this emotion. Focus on meditation, breathing, relaxation, or gentle '
+        f'self-help content. Return ONLY a JSON array of 3 strings, nothing else. '
+        f'Example: ["calm anxiety breathing exercise", "guided meditation for worry", '
+        f'"5 minute mindfulness anxiety relief"]'
+    )
 
     try:
-        response = requests.post(
+        resp = requests.post(
             'https://api.anthropic.com/v1/messages',
             headers={
                 'x-api-key': api_key,
@@ -82,200 +112,219 @@ def get_ai_message(emotion):
             },
             json={
                 'model': 'claude-haiku-4-5-20251001',
-                'max_tokens': 150,
-                'messages': [{
-                    'role': 'user',
-                    'content': (
-                        f'You are Mellow, a gentle wellness mascot. '
-                        f'A user is {hint}. '
-                        f'Write a single warm, empathetic 2-sentence message to comfort them '
-                        f'and encourage them to watch some helpful videos. '
-                        f'Keep it gentle, non-clinical, and friendly.'
-                    )
-                }]
+                'max_tokens': 200,
+                'messages': [{'role': 'user', 'content': prompt}],
             },
-            timeout=10
+            timeout=10,
         )
-        data = response.json()
-        return data['content'][0]['text'].strip()
-    except Exception:
-        return _default_message(emotion)
+        text = resp.json()['content'][0]['text'].strip()
+        # Strip markdown code fences if present
+        text = text.replace('```json', '').replace('```', '').strip()
+        queries = json.loads(text)
+        if isinstance(queries, list) and len(queries) >= 1:
+            return queries[:3]
+    except Exception as e:
+        logger.warning('Claude API error: %s', e)
+
+    return _default_queries(emotion)
 
 
-def _default_message(emotion):
+def _default_queries(emotion: str) -> list[str]:
     defaults = {
-        'angry': "It's okay to feel angry — your feelings are valid. Let's find something to help you breathe and release that tension. 💙",
-        'anxious': "Anxiety can feel so overwhelming, but you're not alone. I've picked some gentle videos to help you find your calm. 🌿",
-        'stressed': "You've been carrying so much — let's take a moment together. These videos are here to help you decompress and breathe. ☁️",
-        'restless': "That restless feeling is hard to sit with. Let's guide your mind somewhere peaceful with these soothing videos. 🌙",
+        'angry':    ['release anger meditation', 'calm anger breathing exercise', 'anger management guided meditation'],
+        'anxious':  ['anxiety relief breathing', 'calm anxiety guided meditation', '5 minute anxiety relief'],
+        'stressed': ['stress relief meditation', 'relaxing music stress', 'body scan stress release'],
+        'restless': ['calm restless mind meditation', 'deep sleep music restless', 'peaceful nature sounds relaxation'],
     }
-    return defaults.get(emotion, "I'm here for you. Let's find something calming together. 💫")
+    return defaults.get(emotion, ['mental wellness meditation', 'calm mind breathing', 'relaxation guide'])
 
 
-def fetch_youtube_videos(emotion):
-    """Fetch videos from YouTube API or fall back to DB then hardcoded."""
-    # 1. Try DB first
-    db_videos = VideoRecommendation.objects.filter(emotion=emotion, is_active=True)
-    if db_videos.exists():
-        videos = list(db_videos.values('youtube_video_id', 'title', 'thumbnail_url', 'id'))
-        for v in videos:
-            v['embed_url'] = f"https://www.youtube.com/embed/{v['youtube_video_id']}"
-        return videos
+# ── YouTube: search videos ────────────────────────────────────────────────────
 
-    # 2. Try YouTube Data API
-    api_key = settings.YOUTUBE_API_KEY
-    if api_key:
-        config = EMOTION_CONFIG.get(emotion, {})
-        query = config.get('search_query', emotion)
+def search_youtube_videos(queries: list[str], max_per_query: int = 2) -> list[dict]:
+    """
+    Search YouTube Data API v3 for each query and return up to 5 unique videos.
+    Falls back to an empty list on failure.
+    """
+    api_key = getattr(settings, 'YOUTUBE_API_KEY', '')
+    if not api_key:
+        return []
+
+    seen_ids = set()
+    videos   = []
+
+    for query in queries:
+        if len(videos) >= 5:
+            break
         try:
             resp = requests.get(
                 'https://www.googleapis.com/youtube/v3/search',
                 params={
-                    'part': 'snippet',
-                    'q': query,
-                    'type': 'video',
-                    'videoCategoryId': '26',
-                    'maxResults': 4,
-                    'key': api_key,
-                    'relevanceLanguage': 'en',
-                    'safeSearch': 'strict',
+                    'part':             'snippet',
+                    'q':                query,
+                    'type':             'video',
+                    'maxResults':       max_per_query,
+                    'key':              api_key,
+                    'relevanceLanguage':'en',
+                    'safeSearch':       'strict',
+                    'videoCategoryId':  '26',  # Howto & Style (wellness-adjacent)
                 },
-                timeout=8
+                timeout=8,
             )
-            data = resp.json()
-            videos = []
-            for item in data.get('items', []):
+            for item in resp.json().get('items', []):
                 vid_id = item['id']['videoId']
-                snippet = item['snippet']
+                if vid_id in seen_ids:
+                    continue
+                seen_ids.add(vid_id)
+                snip = item['snippet']
                 videos.append({
-                    'youtube_video_id': vid_id,
-                    'title': snippet['title'],
-                    'thumbnail_url': snippet['thumbnails']['medium']['url'],
-                    'embed_url': f"https://www.youtube.com/embed/{vid_id}",
-                    'id': None,
+                    'id':        vid_id,
+                    'title':     snip['title'],
+                    'channel':   snip['channelTitle'],
+                    'thumbnail': snip['thumbnails']['medium']['url'],
                 })
-            if videos:
-                return videos
-        except Exception:
-            pass
+                if len(videos) >= 5:
+                    break
+        except Exception as e:
+            logger.warning('YouTube API error for query "%s": %s', query, e)
 
-    # 3. Hardcoded fallback
-    config = EMOTION_CONFIG.get(emotion, {})
-    fallbacks = config.get('fallback_videos', [])
-    return [
-        {
-            'youtube_video_id': v['id'],
-            'title': v['title'],
-            'thumbnail_url': f"https://img.youtube.com/vi/{v['id']}/mqdefault.jpg",
-            'embed_url': f"https://www.youtube.com/embed/{v['id']}",
-            'id': None,
-        }
-        for v in fallbacks
-    ]
+    return videos
 
 
-# ── Views ──────────────────────────────────────────────────────────────────────
+def get_videos_for_emotion(emotion: str) -> list[dict]:
+    """
+    Full pipeline: AI queries → YouTube search → fallback.
+    Always returns exactly 5 video dicts with keys: id, title, channel, thumbnail.
+    """
+    queries = get_ai_search_queries(emotion)
+    videos  = search_youtube_videos(queries)
+
+    if len(videos) < 5:
+        # Pad with fallbacks (avoid duplicates)
+        existing_ids = {v['id'] for v in videos}
+        for fb in FALLBACK_VIDEOS.get(emotion, []):
+            if fb['id'] not in existing_ids:
+                videos.append({
+                    'id':        fb['id'],
+                    'title':     fb['title'],
+                    'channel':   fb['channel'],
+                    'thumbnail': f"https://img.youtube.com/vi/{fb['id']}/mqdefault.jpg",
+                })
+                existing_ids.add(fb['id'])
+            if len(videos) >= 5:
+                break
+
+    return videos[:5]
+
+
+# ── Views ─────────────────────────────────────────────────────────────────────
 
 def landing(request):
-    """Landing page — mascot asks how you're feeling."""
+    """Landing page — mascot + emotion selector."""
     return render(request, 'wellness/landing.html', {
-        'emotions': EMOTION_CONFIG,
+        'emotions': EMOTION_META,
     })
 
 
 def recommendations(request, emotion):
-    """Show video recommendations for the chosen emotion."""
-    if emotion not in EMOTION_CONFIG:
+    """
+    Recommendation page.
+    Accepts both GET (direct URL) and POST (AJAX redirect target).
+    """
+    if emotion not in EMOTION_META:
         from django.http import Http404
-        raise Http404("Emotion not found")
+        raise Http404('Unknown emotion')
 
-    config = EMOTION_CONFIG[emotion]
-    videos = fetch_youtube_videos(emotion)
-    ai_message = get_ai_message(emotion)
+    meta   = EMOTION_META[emotion]
+    videos = get_videos_for_emotion(emotion)
 
-    # Create session
-    session_key = request.session.session_key or ''
+    # Store video IDs in session for the rating step
+    video_ids = ','.join(v['id'] for v in videos)
     if not request.session.session_key:
         request.session.create()
-        session_key = request.session.session_key
-
-    session = WellnessSession.objects.create(
-        emotion=emotion,
-        session_key=session_key,
-        ai_message=ai_message,
-    )
+    request.session['last_emotion']  = emotion
+    request.session['last_video_ids'] = video_ids
 
     return render(request, 'wellness/recommendations.html', {
-        'emotion': emotion,
-        'config': config,
-        'videos': videos,
-        'ai_message': ai_message,
-        'session_id': session.id,
-        'emotions': EMOTION_CONFIG,
+        'emotion':    emotion,
+        'meta':       meta,
+        'videos':     videos,
+        'video_ids':  video_ids,
+        'emotions':   EMOTION_META,
     })
 
 
 @require_POST
+def select_emotion(request):
+    """
+    AJAX endpoint: receives { emotion } JSON, returns { redirect_url }.
+    Used by the landing page fetch() call.
+    """
+    try:
+        data    = json.loads(request.body)
+        emotion = data.get('emotion', '').lower().strip()
+    except (json.JSONDecodeError, AttributeError):
+        emotion = ''
+
+    if emotion not in EMOTION_META:
+        return JsonResponse({'error': 'Invalid emotion'}, status=400)
+
+    from django.urls import reverse
+    return JsonResponse({'redirect_url': reverse('wellness:recommendations', args=[emotion])})
+
+
+@require_POST
 def submit_rating(request):
-    """Ajax endpoint — save a star rating for a video."""
+    """AJAX endpoint: receives { emotion, rating, video_ids } and saves to DB."""
     try:
         data = json.loads(request.body)
-        stars = int(data.get('stars', 0))
-        emotion = data.get('emotion', '')
-        video_id_str = data.get('video_id')
-        session_id = data.get('session_id')
-        feedback = data.get('feedback', '')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-        if emotion not in EMOTION_CONFIG or stars < 0 or stars > 5:
-            return JsonResponse({'error': 'Invalid data'}, status=400)
+    emotion  = data.get('emotion', '').lower().strip()
+    rating   = data.get('rating')
+    video_ids = data.get('video_ids', '')
 
-        session = None
-        if session_id:
-            try:
-                session = WellnessSession.objects.get(id=session_id)
-            except WellnessSession.DoesNotExist:
-                pass
+    if emotion not in EMOTION_META:
+        return JsonResponse({'error': 'Invalid emotion'}, status=400)
 
-        video = None
-        if video_id_str:
-            try:
-                video = VideoRecommendation.objects.get(id=int(video_id_str))
-            except (VideoRecommendation.DoesNotExist, ValueError):
-                # Create a minimal record
-                yt_id = data.get('youtube_video_id', '')
-                title = data.get('title', 'Unknown Video')
-                if yt_id:
-                    video, _ = VideoRecommendation.objects.get_or_create(
-                        youtube_video_id=yt_id,
-                        emotion=emotion,
-                        defaults={'title': title}
-                    )
+    try:
+        rating = int(rating)
+        assert 0 <= rating <= 5
+    except (TypeError, ValueError, AssertionError):
+        return JsonResponse({'error': 'Rating must be 0–5'}, status=400)
 
-        if video is None:
-            return JsonResponse({'error': 'Video not found'}, status=400)
+    if not request.session.session_key:
+        request.session.create()
 
-        session_key = request.session.session_key or ''
-        rating = VideoRating.objects.create(
-            session=session,
-            video=video,
-            emotion=emotion,
-            stars=stars,
-            feedback=feedback,
-            session_key=session_key,
-        )
+    WellnessRating.objects.create(
+        emotion_selected=emotion,
+        rating_score=rating,
+        video_ids=video_ids,
+        session_key=request.session.session_key,
+    )
 
-        return JsonResponse({'success': True, 'rating_id': rating.id})
-
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    from django.urls import reverse
+    return JsonResponse({
+        'success':      True,
+        'redirect_url': reverse('wellness:thank_you') + f'?emotion={emotion}&stars={rating}',
+    })
 
 
 def thank_you(request):
-    """Thank-you page after rating."""
+    """Thank-you page shown after rating is submitted."""
     emotion = request.GET.get('emotion', '')
-    config = EMOTION_CONFIG.get(emotion, {})
+    stars   = request.GET.get('stars', '0')
+    meta    = EMOTION_META.get(emotion, {})
+
+    try:
+        stars = int(stars)
+    except ValueError:
+        stars = 0
+
     return render(request, 'wellness/thank_you.html', {
-        'emotion': emotion,
-        'config': config,
-        'emotions': EMOTION_CONFIG,
+        'emotion':  emotion,
+        'meta':     meta,
+        'stars':    stars,
+        'emotions': EMOTION_META,
     })

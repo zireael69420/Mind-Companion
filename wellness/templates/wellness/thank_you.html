@@ -1,78 +1,164 @@
-{% extends 'base.html' %}
+{% comment %}
+FILE: wellness/templates/wellness/thank_you.html
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mellow — Thank You!</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    :root { --ink:#3D2C35; --muted:#9B8EA0; --cream:#FFF8F0; }
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    body { font-family:'DM Sans',sans-serif; background:var(--cream); min-height:100vh; overflow:hidden; }
+    .bg-mesh {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(ellipse 70% 55% at 15% 20%, #FFE4EC66 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 15%, #D4F5EC66 0%, transparent 55%),
+        radial-gradient(ellipse 55% 60% at 80% 85%, #E8D5F566 0%, transparent 60%),
+        var(--cream);
+    }
+    .page {
+      position:relative; z-index:2; min-height:100vh;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:2rem 1rem; gap:0; text-align:center;
+    }
+    .card {
+      background:rgba(255,255,255,0.78);
+      border:1.5px solid rgba(255,255,255,0.95);
+      backdrop-filter:blur(12px);
+      border-radius:28px; padding:2.5rem 2rem;
+      max-width:420px; width:100%;
+      box-shadow:0 10px 40px rgba(0,0,0,0.08);
+    }
+    .mascot-big { font-size:4.5rem; line-height:1; margin-bottom:0.75rem; display:block; }
+    h1 {
+      font-family:'Baloo 2',sans-serif; font-weight:900;
+      font-size:clamp(1.6rem,4vw,2.2rem); color:var(--ink); line-height:1.15; margin-bottom:0.5rem;
+    }
+    h1 em {
+      font-style:normal;
+      background:linear-gradient(135deg,#FF6B9D,#FFA45C);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    .stars-display { font-size:1.8rem; margin:0.75rem 0; letter-spacing:2px; }
+    .message { font-size:0.9rem; color:var(--muted); line-height:1.7; font-style:italic; margin-bottom:1.5rem; }
+    .btn-row { display:flex; flex-direction:column; gap:0.75rem; }
+    .btn-primary {
+      font-family:'Baloo 2',sans-serif; font-weight:800; font-size:0.95rem; color:white;
+      background:linear-gradient(135deg,#FF6B9D,#FFA45C); border:none; border-radius:999px;
+      padding:13px 28px; cursor:pointer;
+      box-shadow:0 6px 20px rgba(255,107,157,0.3);
+      text-decoration:none; display:block;
+      transition:transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(255,107,157,0.4); }
+    .btn-secondary {
+      font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.88rem; color:var(--muted);
+      text-decoration:none; padding:10px;
+      transition:color 0.2s;
+    }
+    .btn-secondary:hover { color:var(--ink); }
+    .footer-note { font-size:0.68rem; color:var(--muted); margin-top:1.5rem; line-height:1.7; max-width:320px; }
 
-{% block title %}Mellow — Hope you feel better!{% endblock %}
+    /* Confetti canvas */
+    #confetti-canvas { position:fixed; inset:0; pointer-events:none; z-index:1; }
+  </style>
+</head>
+<body>
+<canvas id="confetti-canvas"></canvas>
+<div class="bg-mesh"></div>
 
-{% block content %}
-<div class="min-h-[85vh] flex flex-col items-center justify-center px-4 py-12 text-center">
+<div class="page">
+  <div class="card" id="card">
+    <span class="mascot-big" id="mascot-big">🌸</span>
+    <h1 id="card-title">Hope you feel a<br/><em>little better</em></h1>
 
-  <!-- Mascot happy -->
-  <div class="mascot-face mb-6 select-none">
-    <svg width="160" height="160" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="90" cy="92" r="72" fill="url(#glow2)" opacity="0.3"/>
-      <circle cx="90" cy="90" r="68" fill="url(#bodyGrad2)"/>
-      <ellipse cx="60" cy="108" rx="14" ry="9" fill="#FFB3C6" opacity="0.7"/>
-      <ellipse cx="120" cy="108" rx="14" ry="9" fill="#FFB3C6" opacity="0.7"/>
-      <!-- Happy closed eyes -->
-      <path d="M 59 80 Q 70 70 81 80" stroke="#2D2D2D" stroke-width="4" stroke-linecap="round" fill="none"/>
-      <path d="M 99 80 Q 110 70 121 80" stroke="#2D2D2D" stroke-width="4" stroke-linecap="round" fill="none"/>
-      <!-- Big smile -->
-      <path d="M 62 102 Q 90 128 118 102" stroke="#2D2D2D" stroke-width="4.5" stroke-linecap="round" fill="none"/>
-      <ellipse cx="22" cy="72" rx="14" ry="18" fill="url(#bodyGrad2)"/>
-      <ellipse cx="158" cy="72" rx="14" ry="18" fill="url(#bodyGrad2)"/>
-      <ellipse cx="22" cy="72" rx="7" ry="11" fill="#FFB3C6" opacity="0.7"/>
-      <ellipse cx="158" cy="72" rx="7" ry="11" fill="#FFB3C6" opacity="0.7"/>
-      <text x="84" y="56" font-size="18" text-anchor="middle">✨</text>
-      <defs>
-        <radialGradient id="bodyGrad2" cx="40%" cy="35%" r="65%">
-          <stop offset="0%" stop-color="#FFE8F5"/>
-          <stop offset="100%" stop-color="#FFC2D9"/>
-        </radialGradient>
-        <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#FFD6EC"/>
-          <stop offset="100%" stop-color="#FFD6EC" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-    </svg>
-  </div>
-
-  <!-- Message -->
-  <div class="card rounded-3xl px-8 py-6 max-w-sm shadow-lg animate-fade-in mb-8">
-    <h1 class="font-display font-900 text-2xl text-gray-700 mb-2">
-      I hope you feel a<br/>
-      <span class="text-rose-400">little better</span> 🌸
-    </h1>
-    <p class="font-body text-gray-500 text-sm leading-relaxed">
-      Remember, it's okay to feel all kinds of emotions. You took a moment for yourself today — that matters. 💙
-    </p>
-  </div>
-
-  <!-- Feeling again? -->
-  {% if config %}
-  <div class="card rounded-2xl px-6 py-4 max-w-xs shadow-md animate-slide-up mb-6">
-    <p class="font-body text-sm text-gray-500 mb-3">You were feeling <strong class="font-display" style="color:{{ config.color }}">{{ config.emoji }} {{ config.label }}</strong> today.</p>
-    <p class="text-xs text-gray-400 font-body">Your session has been saved. Thank you for using Mellow!</p>
-  </div>
-  {% endif %}
-
-  <!-- Actions -->
-  <div class="flex flex-col sm:flex-row gap-3">
-    <a href="{% url 'wellness:landing' %}"
-       class="font-display font-700 px-7 py-3 rounded-full text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
-       style="background:linear-gradient(135deg, #FF90C2, #FFB347);">
-      Start Again 🌸
-    </a>
-    {% if emotion %}
-    <a href="{% url 'wellness:recommendations' emotion %}"
-       class="font-display font-700 px-7 py-3 rounded-full text-gray-600 bg-white shadow-md hover:shadow-lg border border-gray-100 transition-all hover:-translate-y-0.5">
-      Watch More Videos 🎬
-    </a>
+    {% if stars %}
+    <div class="stars-display" id="stars-display">
+      {% for i in "12345" %}{% if forloop.counter <= stars %}⭐{% else %}☆{% endif %}{% endfor %}
+    </div>
     {% endif %}
+
+    <p class="message" id="card-msg">
+      You took a moment for yourself today — that takes courage.<br/>
+      It's okay to feel all of your emotions. Be kind to yourself. 💙
+    </p>
+
+    <div class="btn-row" id="btn-row">
+      <a href="{% url 'wellness:landing' %}" class="btn-primary">Start Again 🌸</a>
+      {% if emotion %}
+      <a href="{% url 'wellness:recommendations' emotion %}" class="btn-secondary">Watch more {{ meta.emoji }} videos</a>
+      {% endif %}
+    </div>
   </div>
 
-  <!-- Disclaimer -->
-  <p class="mt-10 text-xs text-gray-300 font-body max-w-xs text-center">
-    If you're struggling, please reach out to a mental health professional or a trusted person in your life. You're not alone. 💙
+  <p class="footer-note" id="footer-note">
+    If you're struggling, please reach out to a mental health professional<br/>
+    or a trusted person in your life. You are not alone. 💙
   </p>
-
 </div>
-{% endblock %}
+
+<script>
+// ── Intro animation ───────────────────────────────────────────────────────────
+gsap.set(['#card','#footer-note'], { autoAlpha:0, y:24 });
+gsap.set('#mascot-big', { scale:0, rotation:-15 });
+
+const tl = gsap.timeline({ defaults:{ ease:'power3.out' } });
+tl.to('#card',       { autoAlpha:1, y:0, duration:0.6 })
+  .to('#mascot-big', { scale:1, rotation:0, duration:0.7, ease:'back.out(2)' }, '-=0.3')
+  .to('#card-title', { opacity:1, duration:0.4 }, '-=0.1')
+  .to('#footer-note',{ autoAlpha:1, y:0, duration:0.4 }, '-=0.1');
+
+// ── Confetti ─────────────────────────────────────────────────────────────────
+(function(){
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const COLORS  = ['#FFB3C6','#B5EAD7','#FFDCA9','#D4B8E0','#AED9E0','#FFF1A8','#FF8FA3'];
+  const pieces  = Array.from({length: 55}, () => ({
+    x:    Math.random() * canvas.width,
+    y:    Math.random() * canvas.height - canvas.height,
+    w:    Math.random() * 8  + 4,
+    h:    Math.random() * 14 + 6,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    vy:   Math.random() * 2.5 + 1,
+    vx:   (Math.random() - 0.5) * 1.2,
+    rot:  Math.random() * 360,
+    rotV: (Math.random() - 0.5) * 4,
+    alpha: Math.random() * 0.5 + 0.5,
+  }));
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+    pieces.forEach(p => {
+      p.y   += p.vy;
+      p.x   += p.vx;
+      p.rot += p.rotV;
+      if (p.y > canvas.height + 20) {
+        p.y = -20; p.x = Math.random() * canvas.width;
+      }
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.rot * Math.PI) / 180);
+      ctx.globalAlpha = p.alpha * Math.max(0, 1 - frame / 220);
+      ctx.fillStyle   = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    });
+    if (frame < 220) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  draw();
+})();
+</script>
+</body>
+</html>
