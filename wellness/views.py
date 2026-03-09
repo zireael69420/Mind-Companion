@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 
 import requests
 from django.conf import settings
@@ -12,6 +13,9 @@ from django.views.decorators.http import require_POST
 from .models import WellnessRating
 
 logger = logging.getLogger(__name__)
+
+# YouTube video IDs are exactly 11 characters: letters, digits, hyphens, underscores.
+VIDEO_ID_RE = re.compile(r'^[a-zA-Z0-9_-]{11}$')
 
 # ── Emotion meta ──────────────────────────────────────────────────────────────
 
@@ -75,21 +79,23 @@ FALLBACK_VIDEOS = {
 }
 
 
-def _build_video_dict(video_id: str, title: str, channel: str) -> dict:
+def _build_video_dict(video_id: str, title: str, channel: str) -> dict | None:
     """
-    Single source of truth.
-    All three URLs are derived from the same video_id string.
+    Single source of truth for all video URLs.
+    Returns None if video_id fails the 11-char YouTube ID regex.
+    All three URLs are derived from the same validated video_id.
     Embed URL uses only rel=0 and modestbranding=1 — no enablejsapi, no origin.
     """
+    if not VIDEO_ID_RE.match(video_id):
+        logger.warning('Rejected invalid video_id: %r', video_id)
+        return None
     return {
         'video_id':  video_id,
         'title':     title,
         'channel':   channel,
-        # Simple, clean embed URL — no extra parameters that can trigger Error 153
         'embed_url': f'https://www.youtube.com/embed/{video_id}?rel=0&modestbranding=1',
-        # hqdefault is the most reliably available thumbnail size
-        'thumbnail': f'https://img.youtube.com/vi/{video_id}/hqdefault.jpg',
-        # Standard watch link
+        # mqdefault (320×180) exists for every video; hqdefault does not
+        'thumbnail': f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg',
         'watch_url': f'https://www.youtube.com/watch?v={video_id}',
     }
 
@@ -194,14 +200,14 @@ def search_youtube_videos(queries: list[str]) -> list[dict]:
             if len(videos) >= TARGET_VIDEOS:
                 break
 
-            # ── Extract videoId ──────────────────────────────────────────────
+            # ── Extract & validate videoId ───────────────────────────────────
             # item["id"] is a ResourceId object: {"kind": "youtube#video", "videoId": "..."}
             id_obj   = item.get('id', {})
             video_id = id_obj.get('videoId', '').strip()
 
-            # Skip if videoId is missing or not a string
-            if not video_id or not isinstance(video_id, str):
-                logger.debug('Skipping item — no valid videoId: %s', id_obj)
+            # Must be a non-empty string matching the 11-char YouTube ID format
+            if not VIDEO_ID_RE.match(video_id):
+                logger.debug('Skipping item — invalid videoId: %r', video_id)
                 continue
 
             # Skip duplicates
@@ -222,11 +228,13 @@ def search_youtube_videos(queries: list[str]) -> list[dict]:
 
             # ── Accept this video ────────────────────────────────────────────
             seen_ids.add(video_id)
-            videos.append(_build_video_dict(
+            entry = _build_video_dict(
                 video_id=video_id,
                 title=snip.get('title', 'Wellness Video'),
                 channel=snip.get('channelTitle', ''),
-            ))
+            )
+            if entry:
+                videos.append(entry)
 
     return videos
 
@@ -249,10 +257,10 @@ def get_videos_for_emotion(emotion: str) -> list[dict]:
         existing_ids = {v['video_id'] for v in videos}
         for fb in FALLBACK_VIDEOS.get(emotion, []):
             if fb['video_id'] not in existing_ids:
-                videos.append(_build_video_dict(
-                    fb['video_id'], fb['title'], fb['channel']
-                ))
-                existing_ids.add(fb['video_id'])
+                entry = _build_video_dict(fb['video_id'], fb['title'], fb['channel'])
+                if entry:
+                    videos.append(entry)
+                    existing_ids.add(fb['video_id'])
             if len(videos) >= TARGET_VIDEOS:
                 break
 

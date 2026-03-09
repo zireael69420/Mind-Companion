@@ -1,7 +1,7 @@
 {% comment %}
 FILE: wellness/templates/wellness/recommendations.html
-Embed URL format: https://www.youtube.com/embed/{video_id}?rel=0&modestbranding=1
-No enablejsapi, no origin parameter — keeps embeds clean and avoids Error 153.
+Embed URL: https://www.youtube.com/embed/{id}?rel=0&modestbranding=1&enablejsapi=1&origin={window.location.origin}
+Thumbnail:  https://img.youtube.com/vi/{id}/mqdefault.jpg  (mqdefault exists for every video)
 All three URLs (embed, thumbnail, watch) derived from the same video_id.
 {% endcomment %}
 <!DOCTYPE html>
@@ -234,11 +234,15 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
   <div id="modal-box">
 
     <div id="modal-iframe-wrap">
-      <iframe id="modal-iframe" src="" allowfullscreen
+      <!-- src is always set programmatically — never hardcoded here -->
+      <iframe
+        id="youtube-player"
+        src=""
+        allowfullscreen
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share">
       </iframe>
 
-      <!-- Fallback: shown if iframe fires an error (video disallows embedding) -->
+      <!-- Fallback: shown when a video disallows embedding -->
       <div id="embed-fallback">
         <p class="fallback-title">This video can't be embedded here.</p>
         <p class="fallback-sub">You can still watch it directly on YouTube.</p>
@@ -280,7 +284,10 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
   <div class="video-grid" id="video-grid">
     {% for video in videos %}
     <div class="video-card"
-         onclick="openModal('{{ video.video_id }}', '{{ video.title|escapejs }}', '{{ video.channel|escapejs }}', '{{ video.watch_url }}')"
+         data-video-id="{{ video.video_id }}"
+         data-title="{{ video.title|escapejs }}"
+         data-channel="{{ video.channel|escapejs }}"
+         data-watch-url="{{ video.watch_url }}"
          id="vcard-{{ forloop.counter }}"
          role="button" tabindex="0"
          aria-label="Play: {{ video.title }}">
@@ -290,7 +297,7 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
           src="{{ video.thumbnail }}"
           alt="{{ video.title }}"
           loading="{% if forloop.counter <= 3 %}eager{% else %}lazy{% endif %}"
-          onerror="this.src='https://img.youtube.com/vi/{{ video.video_id }}/hqdefault.jpg'"
+          onerror="this.src='https://img.youtube.com/vi/{{ video.video_id }}/mqdefault.jpg'"
         />
         <div class="play-overlay">
           <div class="play-btn"><div class="play-icon"></div></div>
@@ -340,55 +347,93 @@ tl.to('#page-header',    { autoAlpha:1, y:0, duration:0.5 })
   .to('.video-card',     { autoAlpha:1, y:0, duration:0.38, stagger:0.07 }, '-=0.2')
   .to('#rating-section', { autoAlpha:1, y:0, duration:0.45 }, '-=0.05');
 
-// ── Modal open/close ──────────────────────────────────────────────────────────
-const modal       = document.getElementById('video-modal');
-const iframe      = document.getElementById('modal-iframe');
-const fallbackDiv = document.getElementById('embed-fallback');
+// ════════════════════════════════════════════════════════════════════
+// VIDEO MODAL
+// ════════════════════════════════════════════════════════════════════
+
+const modal        = document.getElementById('video-modal');
+const iframe       = document.getElementById('youtube-player');   // id="youtube-player"
+const fallbackDiv  = document.getElementById('embed-fallback');
 const fallbackLink = document.getElementById('fallback-yt-link');
-const mTitle      = document.getElementById('modal-title');
-const mChannel    = document.getElementById('modal-channel');
-const mWatchLink  = document.getElementById('modal-watch-link');
+const mTitle       = document.getElementById('modal-title');
+const mChannel     = document.getElementById('modal-channel');
+const mWatchLink   = document.getElementById('modal-watch-link');
+
+// Regex matching exactly 11 valid YouTube ID characters
+const YT_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
 
 function openModal(videoId, title, channel, watchUrl) {
-  // Reset fallback state
+  // ── 1. Sanitise the ID in the browser as a second line of defence ──
+  const cleanId = String(videoId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 11);
+
+  if (!YT_ID_RE.test(cleanId)) {
+    console.error('[Mind Companion] Rejected malformed video ID:', videoId);
+    return;
+  }
+
+  // ── 2. Reset any previous state ──────────────────────────────────
+  iframe.src = '';                          // clear first — forces a clean load
   fallbackDiv.classList.remove('show');
-  iframe.style.display = 'block';
 
-  // Simple, clean embed URL — no enablejsapi, no origin (avoids Error 153)
-  iframe.src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+  // ── 3. Build embed URL with enablejsapi + origin so YouTube can verify the domain ──
+  // enablejsapi=1 enables the JS Player API; origin tells YouTube which domain is embedding
+  const embedUrl = `https://www.youtube.com/embed/${cleanId}?rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+  console.log('[Mind Companion] Embedding video:', embedUrl);
+  iframe.src = embedUrl;
 
-  // Info bar — all point to same videoId
-  mTitle.textContent  = title;
+  // ── 4. Update info bar — all three point to the SAME cleanId ─────
+  mTitle.textContent   = title;
   mChannel.textContent = channel;
-  mWatchLink.href     = watchUrl;
-  fallbackLink.href   = watchUrl;
+  const ytWatchUrl     = `https://www.youtube.com/watch?v=${cleanId}`;
+  mWatchLink.href      = ytWatchUrl;
+  fallbackLink.href    = ytWatchUrl;
 
+  // ── 5. Open modal ─────────────────────────────────────────────────
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
-
-  // Listen for iframe errors (embedding disabled by uploader)
-  iframe.onerror = showFallback;
-}
-
-function showFallback() {
-  iframe.style.display = 'none';
-  fallbackDiv.classList.add('show');
 }
 
 function closeModal() {
   modal.classList.remove('open');
-  // Stop video playback by clearing src after transition
+  document.body.style.overflow = '';
+  // Wait for the CSS transition to finish, THEN clear the src
+  // so the video stops playing and doesn't accumulate params on re-open
   setTimeout(() => {
     iframe.src = '';
-    iframe.onerror = null;
     fallbackDiv.classList.remove('show');
-    iframe.style.display = 'block';
   }, 320);
-  document.body.style.overflow = '';
 }
 
-// Close on Escape
-document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+// ── Event delegation: clicks on .video-card read data attributes ──────────────
+// This avoids any risk of JS string interpolation corrupting the ID.
+document.getElementById('video-grid').addEventListener('click', function(e) {
+  const card = e.target.closest('.video-card');
+  if (!card) return;
+  openModal(
+    card.dataset.videoId,
+    card.dataset.title,
+    card.dataset.channel,
+    card.dataset.watchUrl,
+  );
+});
+
+// Keyboard accessibility for cards
+document.getElementById('video-grid').addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const card = e.target.closest('.video-card');
+  if (!card) return;
+  e.preventDefault();
+  openModal(
+    card.dataset.videoId,
+    card.dataset.title,
+    card.dataset.channel,
+    card.dataset.watchUrl,
+  );
+});
+
+// Backdrop click and Escape key close the modal
+document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 // ── Star rating ───────────────────────────────────────────────────────────────
 let selectedRating = 0;
