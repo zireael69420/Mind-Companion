@@ -363,6 +363,15 @@ const mWatchLink   = document.getElementById('modal-watch-link');
 // Regex matching exactly 11 valid YouTube ID characters
 const YT_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
 
+// Decodes HTML entities in a string (e.g. &amp; → &, &amp;amp; → &amp;)
+// dataset properties return the raw attribute string — entities are NOT
+// automatically decoded by the browser when read via JavaScript.
+function decodeHtml(str) {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = str;
+  return txt.value;
+}
+
 function openModal(videoId, title, channel, watchUrl) {
   // ── 1. Sanitise the ID in the browser as a second line of defence ──
   const cleanId = String(videoId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 11);
