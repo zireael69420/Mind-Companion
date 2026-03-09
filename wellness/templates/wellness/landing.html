@@ -1,5 +1,11 @@
 {% comment %}
 FILE: wellness/templates/wellness/landing.html
+CHANGES vs previous version:
+  - Scene height increased to 78vh so mascot fills 40-50% of screen
+  - Mascot SVG size increased to clamp(280px, min(62vh,58vw), 500px)
+  - Halo (#mc-halo) is always fully visible: opacity:1, no GSAP opacity animation
+  - Removed halo opacity/scale pulse from idle animation loop
+  - Halo still has a gentle static drop-shadow for visual polish
 {% endcomment %}
 {% load static %}
 <!DOCTYPE html>
@@ -7,309 +13,334 @@ FILE: wellness/templates/wellness/landing.html
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mellow — How are you feeling today?</title>
-
-  <!-- Tailwind -->
+  <title>Mind Companion — How are you feeling today?</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- GSAP + plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
 
   <style>
-    :root {
-      --ink:   #3D2C35;
-      --muted: #9B8EA0;
-      --cream: #FFF8F0;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --ink:#3D2C35; --muted:#9B8EA0; --cream:#FFF8F0; }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 
     body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--cream);
-      min-height: 100vh;
-      overflow: hidden;
+      font-family:'DM Sans',sans-serif;
+      background:var(--cream);
+      height:100vh; overflow:hidden;
+      display:flex; flex-direction:column;
     }
 
-    /* ── Canvas for particles ── */
-    #particle-canvas {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ── Gradient mesh background ── */
     .bg-mesh {
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
-        radial-gradient(ellipse 70% 55% at 15% 20%, #FFE4EC99 0%, transparent 60%),
-        radial-gradient(ellipse 60% 50% at 85% 15%, #D4F5EC99 0%, transparent 55%),
-        radial-gradient(ellipse 55% 60% at 80% 85%, #E8D5F599 0%, transparent 60%),
-        radial-gradient(ellipse 65% 50% at 10% 80%, #FFF3C499 0%, transparent 55%),
+        radial-gradient(ellipse 65% 50% at 10% 15%,  #FFE4EC88 0%, transparent 60%),
+        radial-gradient(ellipse 55% 50% at 90% 10%,  #D4F5EC77 0%, transparent 55%),
+        radial-gradient(ellipse 50% 55% at 85% 90%,  #E8D5F577 0%, transparent 60%),
+        radial-gradient(ellipse 60% 45% at 5%  85%,  #FFF3C488 0%, transparent 55%),
         var(--cream);
-      animation: meshShift 12s ease-in-out infinite alternate;
+      animation:meshShift 14s ease-in-out infinite alternate;
     }
     @keyframes meshShift {
-      0%   { filter: hue-rotate(0deg)   brightness(1);    }
-      50%  { filter: hue-rotate(8deg)   brightness(1.02); }
-      100% { filter: hue-rotate(-6deg)  brightness(0.99); }
+      0%   { filter:hue-rotate(0deg)  brightness(1);    }
+      100% { filter:hue-rotate(10deg) brightness(1.02); }
     }
 
-    /* ── Layout ── */
+    #particle-canvas { position:fixed; inset:0; pointer-events:none; z-index:0; }
+
+    /* Mascot outer glow — static, no animation on the wrapper filter */
+    .mascot-glow {
+      filter:
+        drop-shadow(0 0 20px rgba(191,233,255,0.60))
+        drop-shadow(0 0 40px rgba(196,181,249,0.32))
+        drop-shadow(0 24px 52px rgba(143,120,207,0.20));
+    }
+
+    /* ── Nav ── */
+    .nav {
+      position:relative; z-index:10;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0.75rem 1.75rem 0; flex-shrink:0;
+    }
+    .brand {
+      font-family:'Baloo 2',sans-serif; font-weight:900;
+      font-size:1.2rem; color:#8570CF; text-decoration:none;
+      display:flex; align-items:center; gap:0.4rem;
+    }
+    .nav-tag { font-size:0.7rem; color:var(--muted); font-style:italic; letter-spacing:0.08em; }
+
+    /* ── Page core ── */
     .page {
-      position: relative; z-index: 2;
-      min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 0; padding: 1.5rem 1rem 3rem;
+      position:relative; z-index:2;
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      padding:0 1rem 0; gap:0;
     }
 
-    /* ── Headline ── */
-    .headline { text-align: center; }
-    .eyebrow {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 0.72rem; font-weight: 400; letter-spacing: 0.2em;
-      color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem;
-      font-style: italic;
-    }
+    /* ── Headline — compact so mascot dominates ── */
+    .headline { text-align:center; margin-bottom:clamp(0.2rem,1.2vh,0.75rem); flex-shrink:0; }
     h1 {
-      font-family: 'Baloo 2', sans-serif;
-      font-size: clamp(1.9rem, 4.5vw, 3rem);
-      font-weight: 900; line-height: 1.1; color: var(--ink);
+      font-family:'Baloo 2',sans-serif;
+      font-size:clamp(1.3rem,2.8vw,2.1rem);
+      font-weight:900; line-height:1.1; color:var(--ink);
     }
     h1 em {
-      font-style: normal;
-      background: linear-gradient(135deg, #FF6B9D 0%, #FFA45C 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-style:normal;
+      background:linear-gradient(135deg,#8570CF 0%,#C7A0EA 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
     }
-    .sub {
-      margin-top: 0.55rem; font-size: 0.9rem; color: var(--muted);
-      font-weight: 300; font-style: italic;
-    }
+    .sub { font-size:0.78rem; color:var(--muted); font-style:italic; margin-top:0.2rem; }
 
-    /* ── Scene container ── */
+    /* ════════════════════════════════════════════════
+       SCENE — taller so mascot takes 40-50% of screen
+    ════════════════════════════════════════════════ */
     .scene {
-      position: relative;
-      width: min(480px, 88vw);
-      height: min(480px, 88vw);
-      margin: 0.5rem auto;
-      flex-shrink: 0;
+      position:relative;
+      /* Width: up to 78vw but capped so buttons don't go off-screen */
+      width:  clamp(320px, min(78vh, 78vw), 640px);
+      /* Height matches width for a square orbit field */
+      height: clamp(320px, min(78vh, 78vw), 640px);
+      flex-shrink:0;
     }
 
-    /* Decorative orbit ring */
-    .orbit-ring {
-      position: absolute; inset: 10%;
-      border-radius: 50%;
-      border: 1.5px dashed rgba(178, 80, 130, 0.12);
-    }
-
-    /* ── Mascot ── */
     .mascot-wrap {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      will-change: transform;
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      will-change:transform;
     }
-    .mascot-svg {
-      width: clamp(130px, 25vw, 175px);
-      filter: drop-shadow(0 16px 36px rgba(178,80,130,0.2))
-              drop-shadow(0 4px 10px rgba(0,0,0,0.07));
+
+    /* ── LARGER mascot: 40-50% of viewport height ── */
+    .mascot-svg-el {
+      /* min 280px, targets 62% of viewport height, max 500px */
+      width:  clamp(280px, min(62vh, 58vw), 500px);
+      height: clamp(280px, min(62vh, 58vw), 500px);
+      display:block;
+      overflow:visible;
     }
-    /* Mascot aura */
-    .mascot-aura {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: clamp(170px, 34vw, 225px);
-      height: clamp(170px, 34vw, 225px);
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,179,198,0.3) 0%, transparent 70%);
-      pointer-events: none;
-      will-change: transform, opacity;
+    /* Hide the white background rect inside the SVG */
+    .mascot-svg-el > rect:first-of-type { display:none !important; }
+
+    /* Orbit ring */
+    .orbit-ring {
+      position:absolute; border-radius:50%;
+      border:1.5px dashed rgba(143,120,207,0.14);
+      top:50%; left:50%; transform:translate(-50%,-50%);
+      animation:spinRing 36s linear infinite;
+      pointer-events:none;
     }
+    @keyframes spinRing { to { transform:translate(-50%,-50%) rotate(360deg); } }
 
     /* ── Emotion buttons ── */
     .emotion-btn {
-      position: absolute;
-      display: flex; flex-direction: column; align-items: center; gap: 5px;
-      cursor: pointer; border: none; background: none; padding: 0;
-      text-decoration: none;
-      will-change: transform;
+      position:absolute;
+      display:flex; flex-direction:column; align-items:center; gap:5px;
+      cursor:pointer; border:none; background:none; padding:0;
+      text-decoration:none; will-change:transform; opacity:0;
     }
     .btn-pill {
-      display: flex; align-items: center; gap: 8px;
-      padding: 11px 20px; border-radius: 999px;
-      font-family: 'Baloo 2', sans-serif;
-      font-size: clamp(0.82rem, 1.8vw, 0.95rem);
-      font-weight: 700; color: var(--ink);
-      border: 2px solid rgba(255,255,255,0.88);
-      backdrop-filter: blur(12px);
-      box-shadow:
-        0 5px 20px rgba(0,0,0,0.09),
-        inset 0 1px 0 rgba(255,255,255,0.95);
-      white-space: nowrap;
-      position: relative; overflow: hidden;
-      /* glow variable set per-button */
-      transition: box-shadow 0.3s ease;
+      display:flex; align-items:center; gap:10px;
+      padding:clamp(10px,1.5vh,16px) clamp(18px,2.8vw,30px);
+      border-radius:999px;
+      font-family:'Baloo 2',sans-serif;
+      font-size:clamp(0.9rem,1.8vw,1.08rem);
+      font-weight:800; color:var(--ink);
+      border:2.5px solid rgba(255,255,255,0.92);
+      backdrop-filter:blur(14px);
+      box-shadow:0 6px 22px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.95);
+      white-space:nowrap; position:relative; overflow:hidden;
+      transition:box-shadow 0.3s ease;
+    }
+    .btn-pill::after {
+      content:''; position:absolute; inset:0; border-radius:inherit;
+      background:linear-gradient(135deg,rgba(255,255,255,0.5) 0%,rgba(255,255,255,0) 55%);
+      pointer-events:none;
     }
     .btn-pill::before {
-      /* hover glow layer */
-      content: '';
-      position: absolute; inset: 0; border-radius: inherit;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.5) 0%, transparent 70%);
+      content:''; position:absolute; inset:0; border-radius:inherit;
+      opacity:0; transition:opacity 0.3s;
+      background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.55) 0%,transparent 70%);
     }
-    .emotion-btn:hover .btn-pill::before { opacity: 1; }
+    .emotion-btn:hover .btn-pill::before { opacity:1; }
 
-    .btn-angry    { background: linear-gradient(135deg, #FFCDD2, #FFAB91); }
-    .btn-anxious  { background: linear-gradient(135deg, #B2EBF2, #80DEEA); }
-    .btn-stressed { background: linear-gradient(135deg, #DCEDC8, #A5D6A7); }
-    .btn-restless { background: linear-gradient(135deg, #FFF9C4, #FFE082); }
+    .btn-angry    { background:linear-gradient(135deg,#FFCDD2,#FFAB91); }
+    .btn-anxious  { background:linear-gradient(135deg,#B2EBF2,#80DEEA); }
+    .btn-stressed { background:linear-gradient(135deg,#DCEDC8,#A5D6A7); }
+    .btn-restless { background:linear-gradient(135deg,#FFF9C4,#FFE082); }
 
-    .btn-angry:hover    { box-shadow: 0 0 24px 6px rgba(255,100,100,0.3),  0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
-    .btn-anxious:hover  { box-shadow: 0 0 24px 6px rgba(0,188,212,0.3),    0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
-    .btn-stressed:hover { box-shadow: 0 0 24px 6px rgba(76,175,80,0.28),   0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
-    .btn-restless:hover { box-shadow: 0 0 24px 6px rgba(255,200,0,0.3),    0 5px 20px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.95); }
+    .emotion-btn:hover .btn-angry    { box-shadow:0 0 28px 8px rgba(255,100,100,0.32), 0 6px 22px rgba(0,0,0,0.1); }
+    .emotion-btn:hover .btn-anxious  { box-shadow:0 0 28px 8px rgba(0,188,212,0.28),   0 6px 22px rgba(0,0,0,0.1); }
+    .emotion-btn:hover .btn-stressed { box-shadow:0 0 28px 8px rgba(76,175,80,0.26),   0 6px 22px rgba(0,0,0,0.1); }
+    .emotion-btn:hover .btn-restless { box-shadow:0 0 28px 8px rgba(255,200,0,0.28),   0 6px 22px rgba(0,0,0,0.1); }
 
-    .btn-emoji { font-size: 1.35rem; line-height: 1; }
-    .orbit-dot {
-      width: 5px; height: 5px; border-radius: 50%; opacity: 0.55;
-    }
+    .btn-emoji { font-size:clamp(1.3rem,2.5vw,1.8rem); line-height:1; }
+    .orbit-dot { width:6px; height:6px; border-radius:50%; opacity:0.45; }
 
-    /* ── Loading overlay ── */
+    /* Loading overlay */
     #loading-overlay {
-      position: fixed; inset: 0; z-index: 999;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 1.2rem;
-      background: rgba(255,248,240,0.92);
-      backdrop-filter: blur(6px);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.35s ease;
+      position:fixed; inset:0; z-index:999;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem;
+      background:rgba(255,248,240,0.93); backdrop-filter:blur(8px);
+      opacity:0; pointer-events:none; transition:opacity 0.3s;
     }
-    #loading-overlay.show { opacity: 1; pointer-events: all; }
-    .loading-mascot { font-size: 3.5rem; }
-    .loading-text {
-      font-family: 'Baloo 2', sans-serif;
-      font-size: 1.1rem; font-weight: 700; color: var(--ink);
-    }
-    .loading-dots span {
-      display: inline-block;
-      animation: dotBounce 1.2s ease-in-out infinite;
-    }
-    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes dotBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+    #loading-overlay.show { opacity:1; pointer-events:all; }
+    .loading-dots span { display:inline-block; animation:dotBounce 1.2s ease-in-out infinite; }
+    .loading-dots span:nth-child(2){animation-delay:0.2s}
+    .loading-dots span:nth-child(3){animation-delay:0.4s}
+    @keyframes dotBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-7px)}}
 
-    /* ── Ripple on click ── */
     .click-ripple {
-      position: fixed; pointer-events: none; z-index: 500;
-      width: 40px; height: 40px; border-radius: 50%;
-      transform: translate(-50%, -50%) scale(0);
-      opacity: 0.7;
+      position:fixed; pointer-events:none; z-index:500;
+      width:50px; height:50px; border-radius:50%;
+      transform:translate(-50%,-50%) scale(0); opacity:0.8;
     }
 
-    /* ── Footer ── */
     .footer-note {
-      text-align: center; font-size: 0.68rem;
-      color: var(--muted); line-height: 1.7;
-      position: relative; z-index: 2;
+      position:relative; z-index:2; text-align:center;
+      font-size:0.64rem; color:var(--muted); line-height:1.7;
+      padding:0 1rem 0.5rem; flex-shrink:0;
     }
 
-    @media (max-width: 420px) {
-      .scene { width: 94vw; height: 94vw; }
-    }
+    /* On very short screens hide subtext */
+    @media (max-height:580px) { .sub{display:none;} }
+    @media (max-width:380px)  { .scene{width:96vw;height:96vw;} }
   </style>
 </head>
 <body>
 
-<!-- Canvas particles -->
 <canvas id="particle-canvas"></canvas>
-
-<!-- Gradient mesh -->
 <div class="bg-mesh"></div>
 
-<!-- Loading overlay -->
 <div id="loading-overlay">
-  <div class="loading-mascot">🌸</div>
-  <div class="loading-text">Finding something helpful<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></div>
+  <span style="font-size:3rem;">🌸</span>
+  <p style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:1rem;color:var(--ink);">
+    Finding something helpful<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+  </p>
 </div>
 
-<!-- Click ripple -->
 <div class="click-ripple" id="click-ripple"></div>
 
+<!-- Nav -->
+<nav class="nav">
+  <a href="{% url 'wellness:landing' %}" class="brand">🌸 Mind Companion</a>
+  <span class="nav-tag">Your wellness companion</span>
+</nav>
+
+<!-- Page -->
 <div class="page">
 
-  <!-- Headline -->
   <div class="headline" id="headline">
-    <p class="eyebrow" id="eyebrow">✦ your wellness companion ✦</p>
-    <h1 id="h1-text">How are you feeling<br/><em>today?</em></h1>
-    <p class="sub" id="sub-text">Choose an emotion — I'll find something to help&nbsp;💙</p>
+    <h1>How are you feeling <em>today?</em></h1>
+    <p class="sub">Choose an emotion — I'll find something to help&nbsp;💙</p>
   </div>
 
-  <!-- Orbital scene -->
   <div class="scene" id="scene">
 
-    <!-- Orbit decoration ring -->
-    <div class="orbit-ring" id="orbit-ring"></div>
+    <div class="orbit-ring" style="width:92%;height:92%;"></div>
 
-    <!-- Mascot aura / glow -->
-    <div class="mascot-aura" id="mascot-aura"></div>
-
-    <!-- Mascot -->
-    <div class="mascot-wrap" id="mascot">
-      <svg class="mascot-svg" viewBox="0 0 200 210" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Shadow -->
-        <ellipse cx="100" cy="200" rx="50" ry="9" fill="rgba(178,80,130,0.1)"/>
-        <!-- Body -->
-        <circle cx="100" cy="100" r="76" fill="url(#bodyG)"/>
-        <!-- Belly -->
-        <ellipse cx="100" cy="114" rx="34" ry="29" fill="rgba(255,255,255,0.32)"/>
-        <!-- Ears -->
-        <ellipse cx="34"  cy="54" rx="20" ry="26" fill="url(#earG)"/>
-        <ellipse cx="166" cy="54" rx="20" ry="26" fill="url(#earG)"/>
-        <ellipse cx="34"  cy="56" rx="10" ry="15" fill="#FFB3C6" opacity="0.72"/>
-        <ellipse cx="166" cy="56" rx="10" ry="15" fill="#FFB3C6" opacity="0.72"/>
-        <!-- Eye whites -->
-        <ellipse cx="76"  cy="90" rx="17" ry="19" fill="white"/>
-        <ellipse cx="124" cy="90" rx="17" ry="19" fill="white"/>
-        <!-- Irises -->
-        <circle  cx="76"  cy="92" r="11" fill="#3D2C35"/>
-        <circle  cx="124" cy="92" r="11" fill="#3D2C35"/>
-        <!-- Shines -->
-        <circle  cx="80"  cy="87" r="4.5" fill="white"/>
-        <circle  cx="128" cy="87" r="4.5" fill="white"/>
-        <circle  cx="73"  cy="95" r="2"   fill="white" opacity="0.55"/>
-        <circle  cx="121" cy="95" r="2"   fill="white" opacity="0.55"/>
-        <!-- Blush -->
-        <ellipse cx="56"  cy="112" rx="15" ry="9"  fill="#FFB3C6" opacity="0.48"/>
-        <ellipse cx="144" cy="112" rx="15" ry="9"  fill="#FFB3C6" opacity="0.48"/>
-        <!-- Nose -->
-        <ellipse cx="100" cy="107" rx="5" ry="3.5" fill="#3D2C35" opacity="0.45"/>
-        <!-- Smile -->
-        <path d="M 78 115 Q 100 136 122 115" stroke="#3D2C35" stroke-width="3.8" stroke-linecap="round" fill="none"/>
-        <!-- Heart -->
-        <text x="93" y="68" font-size="15" text-anchor="middle" opacity="0.88">💕</text>
-        <!-- Stars -->
-        <text x="29"  y="95"  font-size="9"  opacity="0.55">✦</text>
-        <text x="162" y="88"  font-size="9"  opacity="0.55">✦</text>
+    <!-- ══ MASCOT (inlined SVG — required for GSAP to target internals) ══ -->
+    <div class="mascot-wrap mascot-glow" id="mascot-wrap">
+      <svg
+        id="mascot-svg"
+        class="mascot-svg-el"
+        width="1024" height="1024" viewBox="0 0 1024 1024"
+        fill="none" xmlns="http://www.w3.org/2000/svg"
+        aria-label="Mind Companion mascot"
+      >
         <defs>
-          <radialGradient id="bodyG" cx="38%" cy="30%" r="70%">
-            <stop offset="0%"   stop-color="#FFEEF5"/>
-            <stop offset="55%"  stop-color="#FFD6E8"/>
-            <stop offset="100%" stop-color="#FFC2D9"/>
-          </radialGradient>
-          <radialGradient id="earG" cx="45%" cy="30%" r="70%">
-            <stop offset="0%"   stop-color="#FFE4F0"/>
-            <stop offset="100%" stop-color="#FFB8D4"/>
-          </radialGradient>
+          <linearGradient id="haloGrad" x1="320" y1="112" x2="704" y2="112" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#BFE9FF"/>
+            <stop offset="1" stop-color="#D9B6F8"/>
+          </linearGradient>
+          <linearGradient id="wingGradL" x1="150" y1="520" x2="365" y2="520" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#BFE9FF"/>
+            <stop offset="1" stop-color="#DDBAF8"/>
+          </linearGradient>
+          <linearGradient id="wingGradR" x1="660" y1="520" x2="875" y2="520" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#DDBAF8"/>
+            <stop offset="1" stop-color="#BFE9FF"/>
+          </linearGradient>
+          <linearGradient id="bodyGrad" x1="512" y1="260" x2="512" y2="798" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#F8FAFF"/>
+            <stop offset="1" stop-color="#DCE7FF"/>
+          </linearGradient>
+          <linearGradient id="shadowGrad" x1="512" y1="844" x2="512" y2="883" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#D6D5EC" stop-opacity="0.55"/>
+            <stop offset="1" stop-color="#D6D5EC" stop-opacity="0.15"/>
+          </linearGradient>
+          <filter id="softShadow" x="290" y="820" width="444" height="82" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feGaussianBlur stdDeviation="8"/>
+          </filter>
         </defs>
+
+        <!-- HALO — always fully visible, opacity:1 set in CSS, NOT animated -->
+        <ellipse id="mc-halo" cx="512" cy="158" rx="176" ry="47"
+                 stroke="url(#haloGrad)" stroke-width="18" fill="none"
+                 style="opacity:1;"/>
+
+        <!-- Floating accent sparkles -->
+        <g id="mc-accents">
+          <path d="M291 193L298 209L314 216L298 223L291 239L284 223L268 216L284 209L291 193Z" fill="#F6C5DB"/>
+          <path d="M734 196L741 210L756 217L741 224L734 239L727 224L712 217L727 210L734 196Z" fill="#C7BDF8"/>
+          <path d="M210 320L219 338L238 347L219 356L210 374L201 356L182 347L201 338L210 320Z" fill="#F5D47A"/>
+          <path d="M190 392L196 404L208 410L196 416L190 428L184 416L172 410L184 404L190 392Z" fill="#A9E3FF"/>
+          <circle cx="785" cy="300" r="34" fill="#D8B3F6"/>
+          <circle cx="794" cy="289" r="8" fill="white" fill-opacity="0.7"/>
+          <path d="M821 396L830 414L848 423L830 432L821 450L812 432L794 423L812 414L821 396Z" fill="#F7BED5"/>
+        </g>
+
+        <!-- Wings -->
+        <g id="mc-wing-left">
+          <ellipse cx="250" cy="535" rx="110" ry="63" transform="rotate(-24 250 535)" fill="url(#wingGradL)" fill-opacity="0.8" stroke="#9FCDF7" stroke-width="6"/>
+          <ellipse cx="281" cy="603" rx="63" ry="34" transform="rotate(10 281 603)" fill="#E5C8FA" fill-opacity="0.8" stroke="#CDAAF4" stroke-width="6"/>
+        </g>
+        <g id="mc-wing-right">
+          <ellipse cx="774" cy="535" rx="110" ry="63" transform="rotate(24 774 535)" fill="url(#wingGradR)" fill-opacity="0.8" stroke="#9FCDF7" stroke-width="6"/>
+          <ellipse cx="743" cy="603" rx="63" ry="34" transform="rotate(-10 743 603)" fill="#E5C8FA" fill-opacity="0.8" stroke="#CDAAF4" stroke-width="6"/>
+        </g>
+
+        <!-- Body -->
+        <g id="mc-body">
+          <ellipse cx="512" cy="520" rx="237" ry="265" fill="url(#bodyGrad)" stroke="#8F78CF" stroke-width="6"/>
+          <ellipse cx="512" cy="444" rx="186" ry="120" fill="#FCFCFF" fill-opacity="0.92" stroke="#B6BCEA" stroke-width="6"/>
+          <path d="M375 612C412 597 612 597 649 612V723C649 748 588 767 512 767C436 767 375 748 375 723V612Z" fill="#F8FBFF" fill-opacity="0.38"/>
+        </g>
+
+        <!-- Arms -->
+        <g id="mc-arms">
+          <rect x="228" y="580" width="116" height="142" rx="52" transform="rotate(24 228 580)" fill="#F6F9FF" stroke="#8570CF" stroke-width="6"/>
+          <rect x="680" y="627" width="116" height="142" rx="52" transform="rotate(-24 680 627)" fill="#F6F9FF" stroke="#8570CF" stroke-width="6"/>
+        </g>
+
+        <!-- Face -->
+        <g id="mc-face">
+          <circle id="mc-eye-l" cx="422" cy="431" r="30" fill="#2F3148"/>
+          <circle id="mc-eye-r" cx="602" cy="431" r="30" fill="#2F3148"/>
+          <circle cx="422" cy="420" r="9" fill="white"/>
+          <circle cx="602" cy="420" r="9" fill="white"/>
+          <circle id="mc-blush-l" cx="376" cy="474" r="28" fill="#F7C8DF"/>
+          <circle id="mc-blush-r" cx="648" cy="474" r="28" fill="#F7C8DF"/>
+          <path id="mc-smile" d="M493 456C501 469 523 469 531 456" stroke="#7E3D63" stroke-width="6" stroke-linecap="round"/>
+        </g>
+
+        <!-- Heart -->
+        <g id="mc-heart">
+          <path d="M512 713C493 698 468 680 468 651C468 627 486 614 506 614C519 614 531 620 538 630C545 620 557 614 570 614C590 614 608 627 608 651C608 680 583 698 564 713L538 735L512 713Z" fill="#F2B6D4"/>
+          <ellipse cx="547" cy="629" rx="8" ry="6" transform="rotate(15 547 629)" fill="white" fill-opacity="0.9"/>
+        </g>
+
+        <!-- Bottom sparkles -->
+        <g id="mc-sparkles">
+          <path d="M304 749L310 761L322 767L310 773L304 785L298 773L286 767L298 761L304 749Z" fill="#F3C99A"/>
+          <path d="M338 740L346 756L362 764L346 772L338 788L330 772L314 764L330 756L338 740Z" fill="#C8C2F2"/>
+          <path d="M692 749L699 763L713 770L699 777L692 791L685 777L671 770L685 763L692 749Z" fill="#98DBFF"/>
+          <circle cx="723" cy="759" r="4.5" fill="#C8C2F2"/>
+        </g>
+
+        <!-- Ground shadow -->
+        <g id="mc-shadow" filter="url(#softShadow)">
+          <ellipse cx="512" cy="861" rx="180" ry="18" fill="url(#shadowGrad)"/>
+        </g>
       </svg>
     </div>
+    <!-- ════════════════════════════════════════════════════════════ -->
 
     <!-- Emotion buttons -->
     <a class="emotion-btn" id="btn-angry"    data-emotion="angry"    href="{% url 'wellness:recommendations' 'angry' %}">
@@ -328,252 +359,305 @@ FILE: wellness/templates/wellness/landing.html
       <div class="btn-pill btn-restless"><span class="btn-emoji">😶</span><span>Restless</span> </div>
       <div class="orbit-dot" style="background:#FFD54F;"></div>
     </a>
+
   </div><!-- /scene -->
-
-  <p class="footer-note" id="footer-note">
-    A supportive tool — not a replacement for professional mental health care.<br/>
-    If you're in crisis, please reach out to a qualified professional. 💙
-  </p>
-
 </div><!-- /page -->
 
+<footer class="footer-note">
+  Mind Companion is a supportive tool — not a substitute for professional mental health care. 💙
+</footer>
+
 <script>
-// ─── Register GSAP plugin ───────────────────────────────────────────────────
-gsap.registerPlugin(MotionPathPlugin);
+// ════════════════════════════════════════════════════════════════════
+// SVG ELEMENT REFERENCES
+// ════════════════════════════════════════════════════════════════════
+const M = {
+  wrap:    document.getElementById('mascot-wrap'),
+  halo:    document.getElementById('mc-halo'),    // ← NEVER animated for opacity
+  body:    document.getElementById('mc-body'),
+  arms:    document.getElementById('mc-arms'),
+  face:    document.getElementById('mc-face'),
+  eyeL:   document.getElementById('mc-eye-l'),
+  eyeR:   document.getElementById('mc-eye-r'),
+  blushL: document.getElementById('mc-blush-l'),
+  blushR: document.getElementById('mc-blush-r'),
+  smile:  document.getElementById('mc-smile'),
+  heart:  document.getElementById('mc-heart'),
+  wingL:  document.getElementById('mc-wing-left'),
+  wingR:  document.getElementById('mc-wing-right'),
+  accents:  document.getElementById('mc-accents'),
+  sparkles: document.getElementById('mc-sparkles'),
+  shadow:   document.getElementById('mc-shadow'),
+};
 
-// ─── 1. INTRO ANIMATION ─────────────────────────────────────────────────────
-const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+// ── 1. INTRO ENTRANCE ────────────────────────────────────────────────
+gsap.set(['#headline', '.emotion-btn', '#mascot-wrap'], { autoAlpha:0 });
+gsap.set('#mascot-wrap', { scale:0.75, y:18 });
+// Halo starts fully visible and stays that way — only scale animates
+gsap.set(M.halo, { scaleX:0.4, transformOrigin:'512px 158px' });
+gsap.set(M.accents,  { opacity:0 });
+gsap.set(M.sparkles, { opacity:0 });
 
-// Set initial states
-gsap.set(['#eyebrow','#h1-text','#sub-text'], { autoAlpha: 0, y: -20 });
-gsap.set('#mascot',        { autoAlpha: 0, scale: 0.7 });
-gsap.set('#mascot-aura',   { autoAlpha: 0, scale: 0.5 });
-gsap.set('#orbit-ring',    { autoAlpha: 0, scale: 0.6, rotation: -30, transformOrigin: '50% 50%' });
-gsap.set('.emotion-btn',   { autoAlpha: 0, scale: 0 });
-gsap.set('#footer-note',   { autoAlpha: 0, y: 10 });
-
-tl
-  .to('#eyebrow',      { autoAlpha: 1, y: 0, duration: 0.6 })
-  .to('#h1-text',      { autoAlpha: 1, y: 0, duration: 0.65 }, '-=0.35')
-  .to('#sub-text',     { autoAlpha: 1, y: 0, duration: 0.5 },  '-=0.3')
-  .to('#orbit-ring',   { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.9, ease: 'back.out(1.4)' }, '-=0.2')
-  .to('#mascot-aura',  { autoAlpha: 1, scale: 1, duration: 0.7, ease: 'power2.out' }, '-=0.5')
-  .to('#mascot',       { autoAlpha: 1, scale: 1, duration: 0.8, ease: 'back.out(1.6)' }, '-=0.4')
-  .to('.emotion-btn',  { autoAlpha: 1, scale: 1, duration: 0.5, ease: 'back.out(2)', stagger: 0.12 }, '-=0.2')
-  .to('#footer-note',  { autoAlpha: 1, y: 0, duration: 0.5 }, '-=0.1');
+const introTL = gsap.timeline({ defaults:{ ease:'power3.out' } });
+introTL
+  .to('#headline',    { autoAlpha:1, y:0, duration:0.5, delay:0.1 })
+  .to('#mascot-wrap', { autoAlpha:1, scale:1, y:0, duration:0.85, ease:'back.out(1.6)' }, '-=0.2')
+  // Halo sweeps in from center — opacity always 1
+  .to(M.halo,         { scaleX:1, duration:0.7, ease:'back.out(1.8)', transformOrigin:'512px 158px' }, '-=0.5')
+  .to(M.accents,      { opacity:1, duration:0.5 }, '-=0.3')
+  .to(M.sparkles,     { opacity:1, duration:0.4 }, '-=0.2')
+  .to('.emotion-btn', { autoAlpha:1, duration:0.42, stagger:0.1, ease:'back.out(2)' }, '-=0.2');
 
 
-// ─── 2. MASCOT: FLOAT UP AND DOWN ───────────────────────────────────────────
-gsap.to('#mascot', {
-  y: -14,
-  duration: 2.8,
-  ease: 'sine.inOut',
-  yoyo: true,
-  repeat: -1,
+// ════════════════════════════════════════════════════════════════════
+// 2. IDLE ANIMATIONS
+// NOTE: M.halo is intentionally excluded from ALL idle loops.
+//       The halo stays static and always visible at opacity:1.
+// ════════════════════════════════════════════════════════════════════
+
+// A. Whole mascot — gentle float
+gsap.to(M.wrap, {
+  y:-15, duration:3.2, ease:'sine.inOut', yoyo:true, repeat:-1
 });
 
-// Aura pulses in sync (slightly different timing = breathing feel)
-gsap.to('#mascot-aura', {
-  scale: 1.18,
-  opacity: 0.5,
-  duration: 2.4,
-  ease: 'sine.inOut',
-  yoyo: true,
-  repeat: -1,
+// B. Breathing — body scale
+gsap.to(M.body, {
+  scaleX:1.025, scaleY:1.018, duration:2.8,
+  ease:'sine.inOut', yoyo:true, repeat:-1,
+  transformOrigin:'512px 520px',
+});
+gsap.to(M.arms, {
+  scaleY:0.97, duration:2.8, ease:'sine.inOut',
+  yoyo:true, repeat:-1, delay:0.4,
+  transformOrigin:'512px 680px',
 });
 
-// Orbit ring slow rotation
-gsap.to('#orbit-ring', {
-  rotation: 360,
-  duration: 32,
-  ease: 'none',
-  repeat: -1,
-  transformOrigin: '50% 50%',
+// C. Wings — gentle flutter (M.halo NOT touched here)
+gsap.to(M.wingL, {
+  rotate:3, transformOrigin:'310px 520px',
+  duration:2.2, ease:'sine.inOut', yoyo:true, repeat:-1,
+});
+gsap.to(M.wingR, {
+  rotate:-3, transformOrigin:'714px 520px',
+  duration:2.2, ease:'sine.inOut', yoyo:true, repeat:-1,
 });
 
+// D. Heart — heartbeat
+gsap.to(M.heart, {
+  scale:1.08, duration:0.5, ease:'power1.inOut',
+  yoyo:true, repeat:-1, repeatDelay:0.9,
+  transformOrigin:'538px 674px',
+});
 
-// ─── 3. EMOTION BUTTONS: ORBITAL FLOAT ──────────────────────────────────────
-// Each button orbits independently around the scene center using sin/cos offsets
-// combined with GSAP timelines so they drift naturally — not mechanically.
-
-const scene  = document.getElementById('scene');
-const buttons = [
-  { el: document.getElementById('btn-angry'),    angle: 0,              rx: 0.38, ry: 0.30, speed: 14, floatAmp: 8,  floatPer: 3.2 },
-  { el: document.getElementById('btn-anxious'),  angle: Math.PI / 2,    rx: 0.40, ry: 0.28, speed: 18, floatAmp: 10, floatPer: 3.8 },
-  { el: document.getElementById('btn-stressed'), angle: Math.PI,        rx: 0.38, ry: 0.30, speed: 16, floatAmp: 7,  floatPer: 2.9 },
-  { el: document.getElementById('btn-restless'), angle: Math.PI * 1.5,  rx: 0.40, ry: 0.28, speed: 20, floatAmp: 9,  floatPer: 3.5 },
-];
-
-// Individual floats for each button (independent vertical drift)
-buttons.forEach(cfg => {
-  gsap.to(cfg.el, {
-    y: `+=${cfg.floatAmp}`,
-    duration: cfg.floatPer,
-    ease: 'sine.inOut',
-    yoyo: true,
-    repeat: -1,
+// E. Accent sparkles — individual float
+Array.from(M.accents.children).forEach((el, i) => {
+  gsap.to(el, {
+    y:-(6 + i*2.5), rotate:(i%2===0 ? 8 : -8),
+    duration:2 + i*0.35, ease:'sine.inOut',
+    yoyo:true, repeat:-1, delay:i*0.22,
+    transformOrigin:'center center',
   });
 });
 
-// rAF-based orbital positioning (GSAP handles the float offset above)
-let paused = {};
-buttons.forEach(cfg => {
-  cfg.el.addEventListener('mouseenter', () => { paused[cfg.el.id] = true; });
-  cfg.el.addEventListener('mouseleave', () => { paused[cfg.el.id] = false; });
+// F. Bottom sparkles — twinkle
+Array.from(M.sparkles.children).forEach((el, i) => {
+  gsap.to(el, {
+    scale:1.3, opacity:0.5,
+    duration:1.2 + i*0.3, ease:'sine.inOut',
+    yoyo:true, repeat:-1, delay:i*0.4,
+    transformOrigin:'center center',
+  });
 });
 
-let lastTime = null;
-function orbitTick(ts) {
-  if (!lastTime) lastTime = ts;
-  const dt = (ts - lastTime) / 1000;
-  lastTime = ts;
+// G. Ground shadow — shrinks when mascot floats
+gsap.to(M.shadow, {
+  scaleX:0.78, opacity:0.6, duration:3.2,
+  ease:'sine.inOut', yoyo:true, repeat:-1,
+  transformOrigin:'512px 861px',
+});
 
-  const W  = scene.offsetWidth;
-  const H  = scene.offsetHeight;
-  const cx = W / 2;
-  const cy = H / 2;
 
-  buttons.forEach(cfg => {
-    if (!paused[cfg.el.id]) {
-      cfg.angle += (2 * Math.PI) / cfg.speed * dt;
-    }
-    const x = cx + cx * cfg.rx * 2 * Math.cos(cfg.angle);
-    const y = cy + cy * cfg.ry * 2 * Math.sin(cfg.angle);
-    cfg.el.style.left = (x - cfg.el.offsetWidth  / 2) + 'px';
-    cfg.el.style.top  = (y - cfg.el.offsetHeight / 2) + 'px';
-  });
+// ════════════════════════════════════════════════════════════════════
+// 3. EMOTION REACTION ANIMATIONS
+// ════════════════════════════════════════════════════════════════════
 
-  requestAnimationFrame(orbitTick);
+function reactionAngry() {
+  return gsap.timeline()
+    .to(M.wrap, { x:-10, duration:0.06, ease:'power2.out' })
+    .to(M.wrap, { x: 12, duration:0.06 })
+    .to(M.wrap, { x:-10, duration:0.06 })
+    .to(M.wrap, { x:  8, duration:0.06 })
+    .to(M.wrap, { x: -6, duration:0.06 })
+    .to(M.wrap, { x:  0, duration:0.12, ease:'power2.out' })
+    .to([M.eyeL, M.eyeR], { scaleY:1.25, duration:0.08, ease:'power2.out', transformOrigin:'center center' }, 0)
+    .to([M.eyeL, M.eyeR], { scaleY:1,    duration:0.25, ease:'power2.in',  transformOrigin:'center center' }, 0.35);
 }
-requestAnimationFrame(orbitTick);
 
-// Hover: pop scale up with GSAP spring
-buttons.forEach(cfg => {
-  cfg.el.addEventListener('mouseenter', () => {
-    gsap.to(cfg.el, { scale: 1.15, duration: 0.3, ease: 'back.out(2.5)' });
+function reactionAnxious() {
+  return gsap.timeline()
+    .to(M.wrap, { rotation:-6, duration:0.2, ease:'power2.out', transformOrigin:'50% 60%' })
+    .to(M.wrap, { scale:1.04, duration:0.18, ease:'sine.inOut' }, 0.1)
+    .to(M.wrap, { scale:0.97, duration:0.18, ease:'sine.inOut' }, 0.28)
+    .to(M.wrap, { scale:1.03, duration:0.14, ease:'sine.inOut' }, 0.46)
+    .to(M.wrap, { rotation:0, scale:1, duration:0.28, ease:'elastic.out(1,0.4)', transformOrigin:'50% 60%' }, 0.55)
+    .to([M.blushL, M.blushR], { opacity:0.3, duration:0.15 }, 0.05)
+    .to([M.blushL, M.blushR], { opacity:1,   duration:0.3  }, 0.45);
+}
+
+function reactionStressed() {
+  return gsap.timeline()
+    .to(M.wrap, { scaleY:0.88, scaleX:1.06, y:12, duration:0.22, ease:'power2.in',  transformOrigin:'50% 80%' })
+    .to(M.wrap, { scaleY:1.05, scaleX:0.97, y:-5, duration:0.22, ease:'power2.out', transformOrigin:'50% 80%' })
+    .to(M.wrap, { scaleY:1, scaleX:1, y:0, duration:0.32, ease:'elastic.out(1,0.45)', transformOrigin:'50% 80%' })
+    .to(M.heart, { scale:1.2, duration:0.18, ease:'power2.out', transformOrigin:'538px 674px' }, 0.08)
+    .to(M.heart, { scale:1,   duration:0.3,  ease:'elastic.out(1,0.5)', transformOrigin:'538px 674px' }, 0.28);
+}
+
+function reactionRestless() {
+  return gsap.timeline()
+    .to(M.wrap, { y:-10, rotation: 4, duration:0.1, ease:'power2.out', transformOrigin:'50% 80%' })
+    .to(M.wrap, { y:  3, rotation:-3, duration:0.1 })
+    .to(M.wrap, { y: -8, rotation: 3, duration:0.09 })
+    .to(M.wrap, { y:  2, rotation:-2, duration:0.09 })
+    .to(M.wrap, { y: -5, rotation: 2, duration:0.08 })
+    .to(M.wrap, { y:  0, rotation: 0, duration:0.18, ease:'power2.out' })
+    .to([M.wingL, M.wingR], { scaleX:1.15, duration:0.12, ease:'power2.out', transformOrigin:'center center' }, 0)
+    .to([M.wingL, M.wingR], { scaleX:1,    duration:0.3,  ease:'elastic.out(1,0.5)', transformOrigin:'center center' }, 0.2);
+}
+
+const REACTIONS = { angry:reactionAngry, anxious:reactionAnxious, stressed:reactionStressed, restless:reactionRestless };
+
+
+// ════════════════════════════════════════════════════════════════════
+// 4. ORBITAL BUTTON POSITIONING
+// ════════════════════════════════════════════════════════════════════
+const btnConfigs = [
+  { id:'btn-angry',    angle:270, floatAmp:9,  floatPer:3.1, speed:0.011 },
+  { id:'btn-anxious',  angle:0,   floatAmp:10, floatPer:3.7, speed:0.009 },
+  { id:'btn-stressed', angle:90,  floatAmp:8,  floatPer:2.8, speed:0.012 },
+  { id:'btn-restless', angle:180, floatAmp:9,  floatPer:3.4, speed:0.010 },
+];
+let btnAngles = btnConfigs.map(c => c.angle);
+let paused    = {};
+let lastTime  = null;
+
+btnConfigs.forEach(cfg => {
+  const el = document.getElementById(cfg.id);
+  gsap.to(el, { y:`+=${cfg.floatAmp}`, duration:cfg.floatPer, ease:'sine.inOut', yoyo:true, repeat:-1 });
+  el.addEventListener('mouseenter', () => { paused[cfg.id] = true; });
+  el.addEventListener('mouseleave', () => { paused[cfg.id] = false; });
+});
+
+function positionButtons(ts) {
+  if (!lastTime) lastTime = ts;
+  const dt = ts - lastTime; lastTime = ts;
+  const scene = document.getElementById('scene');
+  const W = scene.offsetWidth, H = scene.offsetHeight;
+  const cx = W/2, cy = H/2;
+  const rx = cx * 0.90, ry = cy * 0.90;
+
+  btnConfigs.forEach((cfg, i) => {
+    if (!paused[cfg.id]) btnAngles[i] = (btnAngles[i] + cfg.speed * dt) % 360;
+    const rad = (btnAngles[i] * Math.PI) / 180;
+    const el  = document.getElementById(cfg.id);
+    el.style.left = (cx + rx*Math.cos(rad) - el.offsetWidth/2)  + 'px';
+    el.style.top  = (cy + ry*Math.sin(rad) - el.offsetHeight/2) + 'px';
   });
-  cfg.el.addEventListener('mouseleave', () => {
-    gsap.to(cfg.el, { scale: 1, duration: 0.35, ease: 'elastic.out(1,0.5)' });
-  });
+  requestAnimationFrame(positionButtons);
+}
+requestAnimationFrame(positionButtons);
+
+btnConfigs.forEach(cfg => {
+  const el = document.getElementById(cfg.id);
+  el.addEventListener('mouseenter', () => gsap.to(el, { scale:1.12, duration:0.28, ease:'back.out(2.5)' }));
+  el.addEventListener('mouseleave', () => gsap.to(el, { scale:1,    duration:0.4,  ease:'elastic.out(1,0.5)' }));
 });
 
 
-// ─── 4. PARTICLE BACKGROUND ─────────────────────────────────────────────────
-(function() {
+// ════════════════════════════════════════════════════════════════════
+// 5. PARTICLE CANVAS
+// ════════════════════════════════════════════════════════════════════
+(function(){
   const canvas = document.getElementById('particle-canvas');
   const ctx    = canvas.getContext('2d');
-  let   W, H;
-
-  const COLORS = ['#FFB3C6','#B5EAD7','#FFD1A9','#D4B8E0','#AED9E0','#FFF1A8'];
-  const COUNT  = 38;
-
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  // Build particles
-  const particles = Array.from({ length: COUNT }, () => ({
-    x:     Math.random() * W,
-    y:     Math.random() * H,
-    r:     Math.random() * 4 + 1.5,
-    vx:    (Math.random() - 0.5) * 0.25,
-    vy:   -(Math.random() * 0.3 + 0.08),
-    alpha: Math.random() * 0.35 + 0.1,
-    color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    wobble:      Math.random() * Math.PI * 2,
-    wobbleSpeed: Math.random() * 0.015 + 0.005,
+  const COLORS = ['#BFE9FF','#D9B6F8','#F7C8DF','#F5D47A','#C8C2F2','#A9E3FF'];
+  function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+  const particles = Array.from({length:30}, () => ({
+    x:Math.random()*canvas.width, y:Math.random()*canvas.height,
+    r:Math.random()*4+1.5, vx:(Math.random()-0.5)*0.2, vy:-(Math.random()*0.26+0.06),
+    alpha:Math.random()*0.28+0.08,
+    color:COLORS[Math.floor(Math.random()*COLORS.length)],
+    wobble:Math.random()*Math.PI*2, wobbleSpeed:Math.random()*0.012+0.004,
   }));
-
-  function drawParticles() {
-    ctx.clearRect(0, 0, W, H);
-    particles.forEach(p => {
-      p.wobble += p.wobbleSpeed;
-      p.x += p.vx + Math.sin(p.wobble) * 0.18;
-      p.y += p.vy;
-      if (p.y < -10)       { p.y = H + 10; p.x = Math.random() * W; }
-      if (p.x < -10)       p.x = W + 10;
-      if (p.x > W + 10)    p.x = -10;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.alpha * (0.75 + 0.25 * Math.sin(p.wobble));
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{
+      p.wobble+=p.wobbleSpeed; p.x+=p.vx+Math.sin(p.wobble)*0.14; p.y+=p.vy;
+      if(p.y<-10){p.y=canvas.height+10;p.x=Math.random()*canvas.width;}
+      if(p.x<-10)p.x=canvas.width+10; if(p.x>canvas.width+10)p.x=-10;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=p.color; ctx.globalAlpha=p.alpha*(0.75+0.25*Math.sin(p.wobble));
       ctx.fill();
     });
-    ctx.globalAlpha = 1;
-    requestAnimationFrame(drawParticles);
+    ctx.globalAlpha=1; requestAnimationFrame(draw);
   }
-  drawParticles();
+  draw();
 })();
 
 
-// ─── 5. PARALLAX MASCOT ON MOUSE MOVE ───────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════
+// 6. PARALLAX ON MOUSE MOVE
+// ════════════════════════════════════════════════════════════════════
 document.addEventListener('mousemove', e => {
-  const px = (e.clientX / window.innerWidth  - 0.5) * 12;
-  const py = (e.clientY / window.innerHeight - 0.5) * 7;
-  gsap.to('#mascot', {
-    x: px, y: -14 + py,  // -14 is the float offset
-    duration: 1.2, ease: 'power2.out',
-    overwrite: false,
-  });
+  const px = (e.clientX/window.innerWidth -0.5)*14;
+  gsap.to(M.wrap, { x:px, duration:1.5, ease:'power2.out', overwrite:false });
 });
 
 
-// ─── 6. CLICK HANDLER: ripple + AJAX + redirect ──────────────────────────────
+// ════════════════════════════════════════════════════════════════════
+// 7. CLICK HANDLER: reaction → ripple → AJAX → redirect
+// ════════════════════════════════════════════════════════════════════
 const rippleEl = document.getElementById('click-ripple');
-const rippleColors = {
-  angry:    '#FFAB91',
-  anxious:  '#80DEEA',
-  stressed: '#A5D6A7',
-  restless: '#FFE082',
-};
-const loadingOverlay = document.getElementById('loading-overlay');
-const CSRF_TOKEN = '{{ csrf_token }}';
+const overlay  = document.getElementById('loading-overlay');
+const RIPPLE_COLORS = { angry:'#FFAB91', anxious:'#80DEEA', stressed:'#A5D6A7', restless:'#FFE082' };
+const CSRF = '{{ csrf_token }}';
+let reactionRunning = false;
 
-buttons.forEach(cfg => {
-  cfg.el.addEventListener('click', async function(e) {
+btnConfigs.forEach(cfg => {
+  const el = document.getElementById(cfg.id);
+  el.addEventListener('click', async function(e) {
     e.preventDefault();
+    if (reactionRunning) return;
+    reactionRunning = true;
 
-    const emotion = cfg.el.dataset.emotion;
+    const emotion = el.dataset.emotion;
+
+    // Mascot reacts first
+    const fn = REACTIONS[emotion];
+    if (fn) await fn();
 
     // Ripple
-    rippleEl.style.left       = e.clientX + 'px';
-    rippleEl.style.top        = e.clientY + 'px';
-    rippleEl.style.background = rippleColors[emotion] || '#FFB3C6';
-    gsap.fromTo(rippleEl,
-      { scale: 0, opacity: 0.75 },
-      { scale: 28, opacity: 0, duration: 0.7, ease: 'power2.out' }
-    );
+    rippleEl.style.left = e.clientX+'px'; rippleEl.style.top = e.clientY+'px';
+    rippleEl.style.background = RIPPLE_COLORS[emotion] || '#BFE9FF';
+    gsap.fromTo(rippleEl, { scale:0, opacity:0.75 }, { scale:26, opacity:0, duration:0.65, ease:'power2.out' });
 
-    // Button celebration pop
     gsap.timeline()
-      .to(cfg.el, { scale: 1.3, duration: 0.15, ease: 'power2.out' })
-      .to(cfg.el, { scale: 0,   duration: 0.2,  ease: 'power2.in' });
+      .to(el, { scale:1.3, duration:0.12, ease:'power2.out' })
+      .to(el, { scale:0,   duration:0.18, ease:'power2.in'  });
 
-    // Show loading
-    loadingOverlay.classList.add('show');
+    overlay.classList.add('show');
 
-    // AJAX → backend → redirect
     try {
       const resp = await fetch("{% url 'wellness:select_emotion' %}", {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'X-CSRFToken':   CSRF_TOKEN,
-        },
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'X-CSRFToken':CSRF },
         body: JSON.stringify({ emotion }),
       });
       const data = await resp.json();
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url;
-      } else {
-        window.location.href = cfg.el.href;
-      }
+      window.location.href = data.redirect_url || el.href;
     } catch {
-      window.location.href = cfg.el.href;
+      window.location.href = el.href;
     }
   });
 });

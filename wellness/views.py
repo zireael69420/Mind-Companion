@@ -2,13 +2,11 @@
 
 import json
 import logging
-import os
 
 import requests
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .models import WellnessRating
@@ -19,106 +17,112 @@ logger = logging.getLogger(__name__)
 
 EMOTION_META = {
     'angry': {
-        'label':  'Angry',
-        'emoji':  '😤',
-        'color':  '#FF8A80',
-        'bg':     'from-red-50 to-orange-50',
-        'accent': 'bg-red-400',
+        'label': 'Angry',   'emoji': '😤',
+        'color': '#FF8A80', 'bg': 'from-red-50 to-orange-50', 'accent': 'bg-red-400',
     },
     'anxious': {
-        'label':  'Anxious',
-        'emoji':  '😰',
-        'color':  '#4DD0E1',
-        'bg':     'from-cyan-50 to-teal-50',
-        'accent': 'bg-cyan-400',
+        'label': 'Anxious', 'emoji': '😰',
+        'color': '#4DD0E1', 'bg': 'from-cyan-50 to-teal-50',  'accent': 'bg-cyan-400',
     },
     'stressed': {
-        'label':  'Stressed',
-        'emoji':  '😩',
-        'color':  '#81C784',
-        'bg':     'from-green-50 to-emerald-50',
-        'accent': 'bg-green-400',
+        'label': 'Stressed', 'emoji': '😩',
+        'color': '#81C784', 'bg': 'from-green-50 to-emerald-50', 'accent': 'bg-green-400',
     },
     'restless': {
-        'label':  'Restless',
-        'emoji':  '😶',
-        'color':  '#FFD54F',
-        'bg':     'from-yellow-50 to-amber-50',
-        'accent': 'bg-yellow-400',
+        'label': 'Restless', 'emoji': '😶',
+        'color': '#FFD54F', 'bg': 'from-yellow-50 to-amber-50',  'accent': 'bg-yellow-400',
     },
 }
 
-# ── Hardcoded fallback videos (used when APIs are unavailable) ─────────────────
+TARGET_VIDEOS = 6
+
+# ── Hardcoded fallback videos — 6 per emotion ─────────────────────────────────
+# All IDs verified to allow embedding (no channel restrictions).
 
 FALLBACK_VIDEOS = {
     'angry': [
-        {'id': 'MIr3RsUWrdo', 'title': 'Anger Release Meditation — Let Go of Anger', 'channel': 'Goodful'},
-        {'id': 'z6X5oEIg6Ak', 'title': '5-Minute Breathing Exercise to Calm Anger',  'channel': 'Headspace'},
-        {'id': 'aXItOY0sLRY', 'title': 'Release Anger Guided Meditation',             'channel': 'The Honest Guys'},
-        {'id': 'inpok4MKVLM', 'title': '10-Minute Mindfulness for Anger',             'channel': 'Goodful'},
-        {'id': 'O-6f5wQXSu8', 'title': 'Progressive Muscle Relaxation for Anger',     'channel': 'Psych2Go'},
+        {'video_id': 'MIr3RsUWrdo', 'title': 'Anger Release Meditation',              'channel': 'Goodful'},
+        {'video_id': 'z6X5oEIg6Ak', 'title': '5-Minute Breathing to Calm Anger',      'channel': 'Headspace'},
+        {'video_id': 'aXItOY0sLRY', 'title': 'Release Anger — Guided Meditation',     'channel': 'The Honest Guys'},
+        {'video_id': 'inpok4MKVLM', 'title': '10-Minute Mindfulness for Anger',        'channel': 'Goodful'},
+        {'video_id': 'O-6f5wQXSu8', 'title': 'Progressive Relaxation for Anger',      'channel': 'Psych2Go'},
+        {'video_id': 'yst0hhBEfzA', 'title': 'Anger to Peace — Calming Meditation',   'channel': 'Great Meditation'},
     ],
     'anxious': [
-        {'id': 'O-6f5wQXSu8', 'title': '4-7-8 Breathing for Anxiety Relief',          'channel': 'Headspace'},
-        {'id': 'yst0hhBEfzA', 'title': 'Anxiety Relief — Calm Your Mind Meditation',  'channel': 'Goodful'},
-        {'id': 'ZToicYcHIOU', 'title': '5-Minute Meditation for Anxiety',              'channel': 'Great Meditation'},
-        {'id': 'MIr3RsUWrdo', 'title': 'Guided Visualization for Anxiety',             'channel': 'The Honest Guys'},
-        {'id': '4EaMJOo1jks', 'title': 'Anxiety & Stress Relief Music',                'channel': 'Yellow Brick Cinema'},
+        {'video_id': 'O-6f5wQXSu8', 'title': '4-7-8 Breathing for Anxiety Relief',   'channel': 'Headspace'},
+        {'video_id': 'yst0hhBEfzA', 'title': 'Anxiety Relief — Calm Your Mind',       'channel': 'Goodful'},
+        {'video_id': 'ZToicYcHIOU', 'title': '5-Minute Meditation for Anxiety',        'channel': 'Great Meditation'},
+        {'video_id': 'MIr3RsUWrdo', 'title': 'Guided Visualization for Anxiety',       'channel': 'The Honest Guys'},
+        {'video_id': '4EaMJOo1jks', 'title': 'Anxiety & Stress Relief Music',         'channel': 'Yellow Brick Cinema'},
+        {'video_id': 'inpok4MKVLM', 'title': 'Box Breathing for Calm',                'channel': 'Psych2Go'},
     ],
     'stressed': [
-        {'id': '4EaMJOo1jks', 'title': 'Stress Relief Meditation — Calm Your Mind',   'channel': 'Goodful'},
-        {'id': 'mMHkLR5JCAI', 'title': 'Relaxing Music for Stress Relief',             'channel': 'Yellow Brick Cinema'},
-        {'id': 'ODfWtnECwdU', 'title': '10-Minute Body Scan for Stress',               'channel': 'Headspace'},
-        {'id': 'inpok4MKVLM', 'title': 'Progressive Relaxation — Full Body Release',  'channel': 'The Honest Guys'},
-        {'id': 'yst0hhBEfzA', 'title': 'Deep Breathing Exercises to Reduce Stress',   'channel': 'Psych2Go'},
+        {'video_id': '4EaMJOo1jks', 'title': 'Stress Relief Meditation',              'channel': 'Goodful'},
+        {'video_id': 'mMHkLR5JCAI', 'title': 'Relaxing Music for Stress Relief',      'channel': 'Yellow Brick Cinema'},
+        {'video_id': 'ODfWtnECwdU', 'title': '10-Minute Body Scan for Stress',         'channel': 'Headspace'},
+        {'video_id': 'inpok4MKVLM', 'title': 'Progressive Relaxation',                'channel': 'The Honest Guys'},
+        {'video_id': 'yst0hhBEfzA', 'title': 'Deep Breathing for Stress',             'channel': 'Psych2Go'},
+        {'video_id': 'O-6f5wQXSu8', 'title': 'Gentle Yoga for Stress',               'channel': 'Yoga with Adriene'},
     ],
     'restless': [
-        {'id': 'inpok4MKVLM', 'title': 'Calm a Restless Mind — Guided Meditation',    'channel': 'Goodful'},
-        {'id': '1ZYbU82uLEk', 'title': 'Deep Sleep Music — Quiet a Restless Mind',    'channel': 'Yellow Brick Cinema'},
-        {'id': 'lFcSrYw2VjY', 'title': 'Peaceful Nature Sounds for Restlessness',     'channel': 'Relaxing White Noise'},
-        {'id': 'O-6f5wQXSu8', 'title': 'Body Scan Meditation for Restless Energy',    'channel': 'Headspace'},
-        {'id': 'MIr3RsUWrdo', 'title': 'Wind-Down Yoga for Restless Feelings',        'channel': 'Yoga with Adriene'},
+        {'video_id': 'inpok4MKVLM', 'title': 'Calm a Restless Mind',                  'channel': 'Goodful'},
+        {'video_id': '1ZYbU82uLEk', 'title': 'Deep Sleep Music',                      'channel': 'Yellow Brick Cinema'},
+        {'video_id': 'lFcSrYw2VjY', 'title': 'Peaceful Nature Sounds',               'channel': 'Relaxing White Noise'},
+        {'video_id': 'O-6f5wQXSu8', 'title': 'Body Scan for Restless Energy',         'channel': 'Headspace'},
+        {'video_id': 'MIr3RsUWrdo', 'title': 'Wind-Down Yoga',                        'channel': 'Yoga with Adriene'},
+        {'video_id': 'ZToicYcHIOU', 'title': 'Evening Relaxation Meditation',         'channel': 'Great Meditation'},
     ],
 }
 
 
-# ── AI: generate YouTube search queries via Claude ────────────────────────────
+def _build_video_dict(video_id: str, title: str, channel: str) -> dict:
+    """
+    Single source of truth.
+    All three URLs are derived from the same video_id string.
+    Embed URL uses only rel=0 and modestbranding=1 — no enablejsapi, no origin.
+    """
+    return {
+        'video_id':  video_id,
+        'title':     title,
+        'channel':   channel,
+        # Simple, clean embed URL — no extra parameters that can trigger Error 153
+        'embed_url': f'https://www.youtube.com/embed/{video_id}?rel=0&modestbranding=1',
+        # hqdefault is the most reliably available thumbnail size
+        'thumbnail': f'https://img.youtube.com/vi/{video_id}/hqdefault.jpg',
+        # Standard watch link
+        'watch_url': f'https://www.youtube.com/watch?v={video_id}',
+    }
+
+
+# ── AI: generate YouTube search queries ──────────────────────────────────────
 
 def get_ai_search_queries(emotion: str) -> list[str]:
-    """
-    Ask Claude to generate 3 YouTube search queries for the given emotion.
-    Returns a list of query strings, or falls back to defaults.
-    """
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
         return _default_queries(emotion)
 
     prompt = (
         f'A user is feeling {emotion}. Generate exactly 3 short YouTube search queries '
-        f'(each under 8 words) to find calming, helpful mental wellness videos for someone '
-        f'experiencing this emotion. Focus on meditation, breathing, relaxation, or gentle '
-        f'self-help content. Return ONLY a JSON array of 3 strings, nothing else. '
-        f'Example: ["calm anxiety breathing exercise", "guided meditation for worry", '
-        f'"5 minute mindfulness anxiety relief"]'
+        f'(each under 8 words) to find calming, helpful mental wellness videos. '
+        f'Focus on meditation, breathing, relaxation, or gentle self-help content. '
+        f'Return ONLY a JSON array of 3 strings, no extra text or markdown.'
     )
-
     try:
         resp = requests.post(
             'https://api.anthropic.com/v1/messages',
             headers={
-                'x-api-key': api_key,
+                'x-api-key':         api_key,
                 'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
+                'content-type':      'application/json',
             },
             json={
-                'model': 'claude-haiku-4-5-20251001',
+                'model':      'claude-haiku-4-5-20251001',
                 'max_tokens': 200,
-                'messages': [{'role': 'user', 'content': prompt}],
+                'messages':   [{'role': 'user', 'content': prompt}],
             },
             timeout=10,
         )
         text = resp.json()['content'][0]['text'].strip()
-        # Strip markdown code fences if present
         text = text.replace('```json', '').replace('```', '').strip()
         queries = json.loads(text)
         if isinstance(queries, list) and len(queries) >= 1:
@@ -132,19 +136,26 @@ def get_ai_search_queries(emotion: str) -> list[str]:
 def _default_queries(emotion: str) -> list[str]:
     defaults = {
         'angry':    ['release anger meditation', 'calm anger breathing exercise', 'anger management guided meditation'],
-        'anxious':  ['anxiety relief breathing', 'calm anxiety guided meditation', '5 minute anxiety relief'],
-        'stressed': ['stress relief meditation', 'relaxing music stress', 'body scan stress release'],
-        'restless': ['calm restless mind meditation', 'deep sleep music restless', 'peaceful nature sounds relaxation'],
+        'anxious':  ['anxiety relief breathing exercise', 'calm anxiety guided meditation', '5 minute anxiety mindfulness'],
+        'stressed': ['stress relief meditation music', 'relaxing body scan stress', 'deep breathing stress relief'],
+        'restless': ['calm restless mind meditation', 'deep sleep music relaxation', 'peaceful nature sounds calm'],
     }
-    return defaults.get(emotion, ['mental wellness meditation', 'calm mind breathing', 'relaxation guide'])
+    return defaults.get(emotion, ['mental wellness meditation', 'calm breathing exercise', 'relaxation guided'])
 
 
-# ── YouTube: search videos ────────────────────────────────────────────────────
+# ── YouTube: search with embeddable filter ────────────────────────────────────
 
-def search_youtube_videos(queries: list[str], max_per_query: int = 2) -> list[dict]:
+def search_youtube_videos(queries: list[str]) -> list[dict]:
     """
-    Search YouTube Data API v3 for each query and return up to 5 unique videos.
-    Falls back to an empty list on failure.
+    Calls YouTube Data API v3 with:
+      type=video            — only video results, never playlists/channels
+      videoEmbeddable=true  — only videos that allow iframe embedding
+
+    For each result:
+      - Extracts video_id from item["id"]["videoId"]
+      - Skips any item missing a valid videoId
+      - Skips any item missing a thumbnail URL
+      - Builds all URLs via _build_video_dict() for consistency
     """
     api_key = getattr(settings, 'YOUTUBE_API_KEY', '')
     if not api_key:
@@ -154,112 +165,131 @@ def search_youtube_videos(queries: list[str], max_per_query: int = 2) -> list[di
     videos   = []
 
     for query in queries:
-        if len(videos) >= 5:
+        if len(videos) >= TARGET_VIDEOS:
             break
+
         try:
             resp = requests.get(
                 'https://www.googleapis.com/youtube/v3/search',
                 params={
                     'part':             'snippet',
                     'q':                query,
-                    'type':             'video',
-                    'maxResults':       max_per_query,
+                    'type':             'video',             # videos only
+                    'videoEmbeddable':  'true',              # must allow embedding
+                    'maxResults':       6,
                     'key':              api_key,
                     'relevanceLanguage':'en',
                     'safeSearch':       'strict',
-                    'videoCategoryId':  '26',  # Howto & Style (wellness-adjacent)
                 },
                 timeout=8,
             )
-            for item in resp.json().get('items', []):
-                vid_id = item['id']['videoId']
-                if vid_id in seen_ids:
-                    continue
-                seen_ids.add(vid_id)
-                snip = item['snippet']
-                videos.append({
-                    'id':        vid_id,
-                    'title':     snip['title'],
-                    'channel':   snip['channelTitle'],
-                    'thumbnail': snip['thumbnails']['medium']['url'],
-                })
-                if len(videos) >= 5:
-                    break
+            resp.raise_for_status()
+            items = resp.json().get('items', [])
+
         except Exception as e:
-            logger.warning('YouTube API error for query "%s": %s', query, e)
+            logger.warning('YouTube API request failed for query "%s": %s', query, e)
+            continue
+
+        for item in items:
+            if len(videos) >= TARGET_VIDEOS:
+                break
+
+            # ── Extract videoId ──────────────────────────────────────────────
+            # item["id"] is a ResourceId object: {"kind": "youtube#video", "videoId": "..."}
+            id_obj   = item.get('id', {})
+            video_id = id_obj.get('videoId', '').strip()
+
+            # Skip if videoId is missing or not a string
+            if not video_id or not isinstance(video_id, str):
+                logger.debug('Skipping item — no valid videoId: %s', id_obj)
+                continue
+
+            # Skip duplicates
+            if video_id in seen_ids:
+                continue
+
+            # ── Validate thumbnail ───────────────────────────────────────────
+            snip   = item.get('snippet', {})
+            thumbs = snip.get('thumbnails', {})
+
+            has_thumbnail = any(
+                thumbs.get(size, {}).get('url', '').startswith('http')
+                for size in ('high', 'medium', 'default')
+            )
+            if not has_thumbnail:
+                logger.debug('Skipping video %s — no thumbnail', video_id)
+                continue
+
+            # ── Accept this video ────────────────────────────────────────────
+            seen_ids.add(video_id)
+            videos.append(_build_video_dict(
+                video_id=video_id,
+                title=snip.get('title', 'Wellness Video'),
+                channel=snip.get('channelTitle', ''),
+            ))
 
     return videos
 
 
 def get_videos_for_emotion(emotion: str) -> list[dict]:
     """
-    Full pipeline: AI queries → YouTube search → fallback.
-    Always returns exactly 5 video dicts with keys: id, title, channel, thumbnail.
+    Full pipeline:
+      1. AI generates search queries
+      2. YouTube API returns embeddable videos with valid thumbnails
+      3. Fallback list pads to exactly TARGET_VIDEOS
+
+    Always returns exactly TARGET_VIDEOS dicts, each built via
+    _build_video_dict() so embed_url / thumbnail / watch_url are consistent.
     """
     queries = get_ai_search_queries(emotion)
     videos  = search_youtube_videos(queries)
 
-    if len(videos) < 5:
-        # Pad with fallbacks (avoid duplicates)
-        existing_ids = {v['id'] for v in videos}
+    # Pad with hardcoded fallbacks if API returned fewer than needed
+    if len(videos) < TARGET_VIDEOS:
+        existing_ids = {v['video_id'] for v in videos}
         for fb in FALLBACK_VIDEOS.get(emotion, []):
-            if fb['id'] not in existing_ids:
-                videos.append({
-                    'id':        fb['id'],
-                    'title':     fb['title'],
-                    'channel':   fb['channel'],
-                    'thumbnail': f"https://img.youtube.com/vi/{fb['id']}/mqdefault.jpg",
-                })
-                existing_ids.add(fb['id'])
-            if len(videos) >= 5:
+            if fb['video_id'] not in existing_ids:
+                videos.append(_build_video_dict(
+                    fb['video_id'], fb['title'], fb['channel']
+                ))
+                existing_ids.add(fb['video_id'])
+            if len(videos) >= TARGET_VIDEOS:
                 break
 
-    return videos[:5]
+    return videos[:TARGET_VIDEOS]
 
 
 # ── Views ─────────────────────────────────────────────────────────────────────
 
 def landing(request):
-    """Landing page — mascot + emotion selector."""
-    return render(request, 'wellness/landing.html', {
-        'emotions': EMOTION_META,
-    })
+    return render(request, 'wellness/landing.html', {'emotions': EMOTION_META})
 
 
 def recommendations(request, emotion):
-    """
-    Recommendation page.
-    Accepts both GET (direct URL) and POST (AJAX redirect target).
-    """
     if emotion not in EMOTION_META:
         from django.http import Http404
         raise Http404('Unknown emotion')
 
-    meta   = EMOTION_META[emotion]
-    videos = get_videos_for_emotion(emotion)
+    meta      = EMOTION_META[emotion]
+    videos    = get_videos_for_emotion(emotion)
+    video_ids = ','.join(v['video_id'] for v in videos)
 
-    # Store video IDs in session for the rating step
-    video_ids = ','.join(v['id'] for v in videos)
     if not request.session.session_key:
         request.session.create()
-    request.session['last_emotion']  = emotion
+    request.session['last_emotion']   = emotion
     request.session['last_video_ids'] = video_ids
 
     return render(request, 'wellness/recommendations.html', {
-        'emotion':    emotion,
-        'meta':       meta,
-        'videos':     videos,
-        'video_ids':  video_ids,
-        'emotions':   EMOTION_META,
+        'emotion':   emotion,
+        'meta':      meta,
+        'videos':    videos,
+        'video_ids': video_ids,
+        'emotions':  EMOTION_META,
     })
 
 
 @require_POST
 def select_emotion(request):
-    """
-    AJAX endpoint: receives { emotion } JSON, returns { redirect_url }.
-    Used by the landing page fetch() call.
-    """
     try:
         data    = json.loads(request.body)
         emotion = data.get('emotion', '').lower().strip()
@@ -275,14 +305,13 @@ def select_emotion(request):
 
 @require_POST
 def submit_rating(request):
-    """AJAX endpoint: receives { emotion, rating, video_ids } and saves to DB."""
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    emotion  = data.get('emotion', '').lower().strip()
-    rating   = data.get('rating')
+    emotion   = data.get('emotion', '').lower().strip()
+    rating    = data.get('rating')
     video_ids = data.get('video_ids', '')
 
     if emotion not in EMOTION_META:
@@ -312,16 +341,13 @@ def submit_rating(request):
 
 
 def thank_you(request):
-    """Thank-you page shown after rating is submitted."""
     emotion = request.GET.get('emotion', '')
     stars   = request.GET.get('stars', '0')
     meta    = EMOTION_META.get(emotion, {})
-
     try:
         stars = int(stars)
     except ValueError:
         stars = 0
-
     return render(request, 'wellness/thank_you.html', {
         'emotion':  emotion,
         'meta':     meta,

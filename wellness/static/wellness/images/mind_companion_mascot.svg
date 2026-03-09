@@ -1,0 +1,80 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="haloGrad" x1="320" y1="112" x2="704" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#BFE9FF"/>
+      <stop offset="1" stop-color="#D9B6F8"/>
+    </linearGradient>
+    <linearGradient id="wingGradL" x1="150" y1="520" x2="365" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#BFE9FF"/>
+      <stop offset="1" stop-color="#DDBAF8"/>
+    </linearGradient>
+    <linearGradient id="wingGradR" x1="660" y1="520" x2="875" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#DDBAF8"/>
+      <stop offset="1" stop-color="#BFE9FF"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="512" y1="260" x2="512" y2="798" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FAFF"/>
+      <stop offset="1" stop-color="#DCE7FF"/>
+    </linearGradient>
+    <linearGradient id="shadowGrad" x1="512" y1="844" x2="512" y2="883" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D6D5EC" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#D6D5EC" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="softShadow" x="290" y="820" width="444" height="82" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="white"/>
+
+  <!-- halo -->
+  <ellipse cx="512" cy="158" rx="176" ry="47" stroke="url(#haloGrad)" stroke-width="18" fill="white"/>
+
+  <!-- floating accents -->
+  <path d="M291 193L298 209L314 216L298 223L291 239L284 223L268 216L284 209L291 193Z" fill="#F6C5DB"/>
+  <path d="M734 196L741 210L756 217L741 224L734 239L727 224L712 217L727 210L734 196Z" fill="#C7BDF8"/>
+  <path d="M210 320L219 338L238 347L219 356L210 374L201 356L182 347L201 338L210 320Z" fill="#F5D47A"/>
+  <path d="M190 392L196 404L208 410L196 416L190 428L184 416L172 410L184 404L190 392Z" fill="#A9E3FF"/>
+  <circle cx="785" cy="300" r="34" fill="#D8B3F6"/>
+  <circle cx="794" cy="289" r="8" fill="white" fill-opacity="0.7"/>
+  <path d="M821 396L830 414L848 423L830 432L821 450L812 432L794 423L812 414L821 396Z" fill="#F7BED5"/>
+
+  <!-- wings -->
+  <ellipse cx="250" cy="535" rx="110" ry="63" transform="rotate(-24 250 535)" fill="url(#wingGradL)" fill-opacity="0.8" stroke="#9FCDF7" stroke-width="6"/>
+  <ellipse cx="281" cy="603" rx="63" ry="34" transform="rotate(10 281 603)" fill="#E5C8FA" fill-opacity="0.8" stroke="#CDAAF4" stroke-width="6"/>
+  <ellipse cx="774" cy="535" rx="110" ry="63" transform="rotate(24 774 535)" fill="url(#wingGradR)" fill-opacity="0.8" stroke="#9FCDF7" stroke-width="6"/>
+  <ellipse cx="743" cy="603" rx="63" ry="34" transform="rotate(-10 743 603)" fill="#E5C8FA" fill-opacity="0.8" stroke="#CDAAF4" stroke-width="6"/>
+
+  <!-- body -->
+  <ellipse cx="512" cy="520" rx="237" ry="265" fill="url(#bodyGrad)" stroke="#8F78CF" stroke-width="6"/>
+  <ellipse cx="512" cy="444" rx="186" ry="120" fill="#FCFCFF" fill-opacity="0.92" stroke="#B6BCEA" stroke-width="6"/>
+  <path d="M375 612C412 597 612 597 649 612V723C649 748 588 767 512 767C436 767 375 748 375 723V612Z" fill="#F8FBFF" fill-opacity="0.38"/>
+
+  <!-- arms -->
+  <rect x="228" y="580" width="116" height="142" rx="52" transform="rotate(24 228 580)" fill="#F6F9FF" stroke="#8570CF" stroke-width="6"/>
+  <rect x="680" y="627" width="116" height="142" rx="52" transform="rotate(-24 680 627)" fill="#F6F9FF" stroke="#8570CF" stroke-width="6"/>
+
+  <!-- face -->
+  <circle cx="422" cy="431" r="30" fill="#2F3148"/>
+  <circle cx="602" cy="431" r="30" fill="#2F3148"/>
+  <circle cx="422" cy="420" r="9" fill="white"/>
+  <circle cx="602" cy="420" r="9" fill="white"/>
+  <circle cx="376" cy="474" r="28" fill="#F7C8DF"/>
+  <circle cx="648" cy="474" r="28" fill="#F7C8DF"/>
+  <path d="M493 456C501 469 523 469 531 456" stroke="#7E3D63" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- heart -->
+  <path d="M512 713C493 698 468 680 468 651C468 627 486 614 506 614C519 614 531 620 538 630C545 620 557 614 570 614C590 614 608 627 608 651C608 680 583 698 564 713L538 735L512 713Z" fill="#F2B6D4"/>
+  <ellipse cx="547" cy="629" rx="8" ry="6" transform="rotate(15 547 629)" fill="white" fill-opacity="0.9"/>
+
+  <!-- bottom sparkles -->
+  <path d="M304 749L310 761L322 767L310 773L304 785L298 773L286 767L298 761L304 749Z" fill="#F3C99A"/>
+  <path d="M338 740L346 756L362 764L346 772L338 788L330 772L314 764L330 756L338 740Z" fill="#C8C2F2"/>
+  <path d="M692 749L699 763L713 770L699 777L692 791L685 777L671 770L685 763L692 749Z" fill="#98DBFF"/>
+  <circle cx="723" cy="759" r="4.5" fill="#C8C2F2"/>
+
+  <!-- ground shadow -->
+  <g filter="url(#softShadow)">
+    <ellipse cx="512" cy="861" rx="180" ry="18" fill="url(#shadowGrad)"/>
+  </g>
+</svg>
