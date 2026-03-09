@@ -285,8 +285,8 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
     {% for video in videos %}
     <div class="video-card"
          data-video-id="{{ video.video_id }}"
-         data-title="{{ video.title|escapejs }}"
-         data-channel="{{ video.channel|escapejs }}"
+         data-title="{{ video.title|escape }}"
+         data-channel="{{ video.channel|escape }}"
          data-watch-url="{{ video.watch_url }}"
          id="vcard-{{ forloop.counter }}"
          role="button" tabindex="0"
@@ -377,7 +377,7 @@ function openModal(videoId, title, channel, watchUrl) {
 
   // ── 3. Build embed URL with enablejsapi + origin so YouTube can verify the domain ──
   // enablejsapi=1 enables the JS Player API; origin tells YouTube which domain is embedding
-  const embedUrl = `https://www.youtube.com/embed/${cleanId}?rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+  const embedUrl = `https://www.youtube.com/embed/${cleanId}?rel=0&modestbranding=1&enablejsapi=1&origin=${window.location.origin}`;
   console.log('[Mind Companion] Embedding video:', embedUrl);
   iframe.src = embedUrl;
 
