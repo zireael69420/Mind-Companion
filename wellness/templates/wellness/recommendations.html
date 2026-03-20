@@ -392,8 +392,8 @@ function openModal(videoId, title, channel, watchUrl) {
   iframe.src = embedUrl;
 
   // ── 4. Update info bar — all three point to the SAME cleanId ─────
-  mTitle.textContent   = title;
-  mChannel.textContent = channel;
+  mTitle.textContent   = decodeHtml(title);
+  mChannel.textContent = decodeHtml(channel);
   const ytWatchUrl     = `https://www.youtube.com/watch?v=${cleanId}`;
   mWatchLink.href      = ytWatchUrl;
   fallbackLink.href    = ytWatchUrl;
