@@ -1,5 +1,6 @@
 # wellness/views.py
 
+import html
 import json
 import logging
 import re
@@ -230,8 +231,10 @@ def search_youtube_videos(queries: list[str]) -> list[dict]:
             seen_ids.add(video_id)
             entry = _build_video_dict(
                 video_id=video_id,
-                title=snip.get('title', 'Wellness Video'),
-                channel=snip.get('channelTitle', ''),
+                # YouTube API returns HTML-encoded titles (e.g. &amp; for &).
+                # Unescape here so Django's auto-escaping only runs once.
+                title=html.unescape(snip.get('title', 'Wellness Video')),
+                channel=html.unescape(snip.get('channelTitle', '')),
             )
             if entry:
                 videos.append(entry)

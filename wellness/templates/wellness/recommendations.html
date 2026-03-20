@@ -286,8 +286,8 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
     {% for video in videos %}
     <div class="video-card"
          data-video-id="{{ video.video_id }}"
-         data-title="{{ video.title|escape }}"
-         data-channel="{{ video.channel|escape }}"
+         data-title="{{ video.title }}"
+         data-channel="{{ video.channel }}"
          data-watch-url="{{ video.watch_url }}"
          id="vcard-{{ forloop.counter }}"
          role="button" tabindex="0"
