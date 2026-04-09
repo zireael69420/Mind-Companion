@@ -1,0 +1,46 @@
+{# templates/partials/tab_sync.html
+   Include this just before </body> in every template.
+   It broadcasts login/logout events across tabs using localStorage. #}
+<script>
+(function () {
+  const KEY = 'mc_auth_state';
+
+  // ── Broadcast a state change to other tabs ──────────────────────────────
+  // Call this after a successful login or logout in the current tab.
+  // Django's login/logout views handle the redirect in the current tab;
+  // this only needs to fire in the OTHER tabs via the storage event.
+  //
+  // We write the current login state into localStorage on every page load
+  // so that other tabs already open can react.
+  const currentState = {{ user.is_authenticated|yesno:"'in','out'" }};
+  const stored       = localStorage.getItem(KEY);
+
+  // On first load, just record the current state without triggering a reload.
+  if (stored === null) {
+    localStorage.setItem(KEY, currentState);
+  }
+
+  // ── Listen for changes made by other tabs ───────────────────────────────
+  window.addEventListener('storage', function (e) {
+    if (e.key !== KEY) return;          // ignore unrelated storage changes
+    if (e.newValue === e.oldValue) return;  // no actual change
+
+    // Another tab changed the auth state — reload this tab to sync UI.
+    // A reload is the safest approach: it re-fetches the page with the
+    // correct session state from the server, no client-side guessing needed.
+    window.location.reload();
+  });
+
+  // ── Write state on every page load ─────────────────────────────────────
+  // If this tab navigated to a page where the auth state differs from what
+  // was stored (e.g. this tab just completed a login or logout), update
+  // localStorage so other tabs pick it up via the storage event.
+  if (stored !== null && stored !== currentState) {
+    localStorage.setItem(KEY, currentState);
+    // Note: the storage event does NOT fire in the tab that wrote the value,
+    // only in other tabs — so this tab does not reload itself.
+  } else {
+    localStorage.setItem(KEY, currentState);
+  }
+})();
+</script>

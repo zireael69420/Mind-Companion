@@ -10,8 +10,6 @@ DEBUG      = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 
-# Render injects this variable automatically — it is the app's public hostname.
-# Without it, every request is rejected with 400 → gunicorn shows 502.
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -28,6 +26,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise must be immediately after SecurityMiddleware
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -42,7 +41,7 @@ ROOT_URLCONF = 'mental_wellness.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],   # project-level templates/registration/
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -58,13 +57,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'mental_wellness.wsgi.application'
 
 # ── Database ──────────────────────────────────────────────────────────────────
-# Uses DATABASE_URL env var on Render (PostgreSQL).
-# Falls back to SQLite locally when DATABASE_URL is not set.
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=0,
-        conn_health_checks=True,
+        conn_max_age=600,
     )
 }
 
@@ -89,17 +85,29 @@ USE_I18N      = True
 USE_TZ        = True
 
 # ── Static files ─────────────────────────────────────────────────────────────
+# STATIC_URL:  the URL prefix Django uses in templates ({% static '...' %})
+# STATIC_ROOT: the folder collectstatic copies everything into
+# WhiteNoise serves files from STATIC_ROOT in production.
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# CompressedManifestStaticFilesStorage adds a content-hash to filenames
+# (e.g. admin.css → admin.abc123.css) for cache-busting.
+# WHITENOISE_MANIFEST_STRICT = False tells it NOT to raise a ValueError
+# when a file is referenced in CSS/JS but missing from the manifest
+# (this is what causes the admin 500 — Django admin's CSS references
+# font files that aren't copied by collectstatic on all platforms).
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+WHITENOISE_MANIFEST_STRICT = False
 
 # ── Email — used for 2FA verification codes ───────────────────────────────────
-# Backend: Gmail SMTP via TLS.
-# Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD as Render environment variables.
-#
-# EMAIL_HOST_PASSWORD must be a Gmail App Password, NOT your regular password.
-# Generate one at: https://myaccount.google.com/apppasswords
-# (Gmail account must have 2-Step Verification enabled first.)
 EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST          = 'smtp.gmail.com'
 EMAIL_PORT          = 587
