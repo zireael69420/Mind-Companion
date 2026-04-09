@@ -67,6 +67,23 @@ CHANGES vs previous version:
     }
     .nav-tag { font-size:0.7rem; color:var(--muted); font-style:italic; letter-spacing:0.08em; }
 
+    .auth-bar { display:flex; align-items:center; gap:0.45rem; }
+    .auth-greeting {
+      font-size:0.7rem; color:var(--muted); font-style:italic;
+      max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .auth-link {
+      font-size:0.72rem; color:#8570CF; text-decoration:none; white-space:nowrap;
+      padding:0.3rem 0.75rem; border-radius:999px;
+      border:1.5px solid rgba(133,112,207,0.4); transition:background 0.18s;
+    }
+    .auth-link:hover { background:rgba(133,112,207,0.1); }
+    .auth-link--cta {
+      background:linear-gradient(135deg,#8570CF,#C7A0EA);
+      color:white !important; border-color:transparent;
+    }
+    .auth-link--cta:hover { opacity:0.88; background:linear-gradient(135deg,#8570CF,#C7A0EA); }
+
     /* ── Page core ── */
     .page {
       position:relative; z-index:2;
@@ -221,6 +238,15 @@ CHANGES vs previous version:
 <nav class="nav">
   <a href="{% url 'wellness:landing' %}" class="brand">🌸 Mind Companion</a>
   <span class="nav-tag">Your wellness companion</span>
+  <div class="auth-bar">
+    {% if user.is_authenticated %}
+      <span class="auth-greeting">👋 {{ user.username }}</span>
+      <a href="{% url 'wellness:logout' %}" class="auth-link">Log out</a>
+    {% else %}
+      <a href="{% url 'wellness:login' %}" class="auth-link">Log in</a>
+      <a href="{% url 'wellness:register' %}" class="auth-link auth-link--cta">Register</a>
+    {% endif %}
+  </div>
 </nav>
 
 <!-- Page -->

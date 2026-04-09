@@ -40,6 +40,22 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
       font-size:1.1rem; color:#8570CF; text-decoration:none;
       display:flex; align-items:center; gap:0.35rem;
     }
+    .auth-bar { display:flex; align-items:center; gap:0.45rem; min-width:60px; justify-content:flex-end; }
+    .auth-greeting {
+      font-size:0.7rem; color:var(--muted); font-style:italic;
+      max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .auth-link {
+      font-size:0.72rem; color:#8570CF; text-decoration:none; white-space:nowrap;
+      padding:0.28rem 0.7rem; border-radius:999px;
+      border:1.5px solid rgba(133,112,207,0.4); transition:background 0.18s;
+    }
+    .auth-link:hover { background:rgba(133,112,207,0.1); }
+    .auth-link--cta {
+      background:linear-gradient(135deg,#8570CF,#C7A0EA);
+      color:white !important; border-color:transparent;
+    }
+    .auth-link--cta:hover { opacity:0.88; background:linear-gradient(135deg,#8570CF,#C7A0EA); }
 
     .page-header { text-align:center; margin-bottom:1.5rem; }
     .emotion-badge {
@@ -272,7 +288,15 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
   <nav class="nav">
     <a href="{% url 'wellness:landing' %}" class="back-link">← Back</a>
     <a href="{% url 'wellness:landing' %}" class="brand">🌸 Mind Companion</a>
-    <span style="width:60px;"></span>
+    <div class="auth-bar">
+      {% if user.is_authenticated %}
+        <span class="auth-greeting">👋 {{ user.username }}</span>
+        <a href="{% url 'wellness:logout' %}" class="auth-link">Log out</a>
+      {% else %}
+        <a href="{% url 'wellness:login' %}" class="auth-link">Log in</a>
+        <a href="{% url 'wellness:register' %}" class="auth-link auth-link--cta">Register</a>
+      {% endif %}
+    </div>
   </nav>
 
   <header class="page-header" id="page-header">

@@ -27,7 +27,7 @@
     /* Nav */
     .nav {
       position:relative; z-index:10;
-      display:flex; align-items:center; justify-content:center;
+      display:flex; align-items:center; justify-content:space-between;
       padding:1rem 1.5rem 0; flex-shrink:0;
     }
     .brand {
@@ -35,6 +35,17 @@
       font-size:1.15rem; color:#B25082; text-decoration:none;
       display:flex; align-items:center; gap:0.35rem;
     }
+    .auth-bar { display:flex; align-items:center; gap:0.45rem; }
+    .auth-greeting {
+      font-size:0.7rem; color:var(--muted); font-style:italic;
+      max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .auth-link {
+      font-size:0.72rem; color:#B25082; text-decoration:none; white-space:nowrap;
+      padding:0.28rem 0.7rem; border-radius:999px;
+      border:1.5px solid rgba(178,80,130,0.4); transition:background 0.18s;
+    }
+    .auth-link:hover { background:rgba(178,80,130,0.08); }
 
     .page {
       position:relative; z-index:2; flex:1;
@@ -96,6 +107,14 @@
 
 <nav class="nav">
   <a href="{% url 'wellness:landing' %}" class="brand">🌸 Mind Companion</a>
+  <div class="auth-bar">
+    {% if user.is_authenticated %}
+      <span class="auth-greeting">👋 {{ user.username }}</span>
+      <a href="{% url 'wellness:logout' %}" class="auth-link">Log out</a>
+    {% else %}
+      <a href="{% url 'wellness:login' %}" class="auth-link">Log in</a>
+    {% endif %}
+  </div>
 </nav>
 
 <div class="page">
