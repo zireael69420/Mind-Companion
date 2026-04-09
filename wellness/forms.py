@@ -1,47 +1,49 @@
-# wellness/forms.py
-
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+
+from .models import Comment
 
 
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(
         required=True,
         widget=forms.EmailInput(attrs={
-            'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/70',
-            'placeholder': 'you@example.com',
+            'class': 'mc-input',
+            'placeholder': 'your@email.com',
+            'autocomplete': 'email',
         }),
-        help_text='We keep your email private.',
     )
 
     class Meta:
-        model = User
+        model  = User
         fields = ('username', 'email', 'password1', 'password2')
         widgets = {
             'username': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/70',
+                'class': 'mc-input',
                 'placeholder': 'Choose a username',
+                'autocomplete': 'username',
             }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Apply consistent styling to password fields
         self.fields['password1'].widget.attrs.update({
-            'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/70',
+            'class': 'mc-input',
             'placeholder': 'Create a strong password',
+            'autocomplete': 'new-password',
         })
         self.fields['password2'].widget.attrs.update({
-            'class': 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/70',
+            'class': 'mc-input',
             'placeholder': 'Confirm your password',
+            'autocomplete': 'new-password',
         })
-        # Clear Django's default verbose help text — template shows custom tips
-        self.fields['username'].help_text = 'Letters, digits, and @/./+/-/_ only.'
-        self.fields['password1'].help_text = (
-            'Must be at least 8 characters, not too common, and not entirely numeric.'
-        )
-        self.fields['password2'].help_text = 'Enter the same password again to confirm.'
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').lower()
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError('An account with this email already exists.')
+        return email
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -49,3 +51,18 @@ class RegisterForm(UserCreationForm):
         if commit:
             user.save()
         return user
+
+
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model  = Comment
+        fields = ('body',)
+        widgets = {
+            'body': forms.Textarea(attrs={
+                'class': 'mc-input mc-textarea',
+                'placeholder': 'Share your thoughts about this video…',
+                'rows': 3,
+                'maxlength': 500,
+            }),
+        }
+        labels = {'body': ''}

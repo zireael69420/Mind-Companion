@@ -1,9 +1,6 @@
-# wellness/models.py
-
+from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
-from django.contrib.auth.models import User
-
 
 EMOTION_CHOICES = [
     ('angry',    'Angry'),
@@ -13,69 +10,58 @@ EMOTION_CHOICES = [
 ]
 
 
+class WellnessRating(models.Model):
+    """Original session-level rating — kept intact."""
+    emotion_selected = models.CharField(max_length=20, choices=EMOTION_CHOICES)
+    rating_score     = models.PositiveSmallIntegerField(
+        choices=[(i, str(i)) for i in range(6)]
+    )
+    timestamp   = models.DateTimeField(default=timezone.now)
+    video_ids   = models.TextField(blank=True)
+    session_key = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        ordering     = ['-timestamp']
+        verbose_name = 'Wellness Rating (legacy)'
+
+    def __str__(self):
+        return f'{self.emotion_selected} — {self.rating_score}★ ({self.timestamp:%Y-%m-%d})'
+
 
 class VideoRating(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    video_id = models.CharField(max_length=100)
+    """Per-video star rating tied to a logged-in user.
+    unique_together enforces one rating per user per video.
+    Re-rating uses update_or_create so it updates instead of duplicating."""
+    user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_ratings')
+    video_id    = models.CharField(max_length=20)
     video_title = models.CharField(max_length=255, blank=True)
-    score = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    score       = models.PositiveSmallIntegerField(
+        choices=[(i, f'{i} star{"s" if i != 1 else ""}') for i in range(1, 6)]
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('user', 'video_id') # One rating per user per video
+        unique_together = ('user', 'video_id')
+        ordering        = ['-updated_at']
+        verbose_name    = 'Video Rating'
 
     def __str__(self):
-        return f"{self.user.username} - {self.video_title} ({self.score}/5)"
+        return f'{self.user.username} → {self.video_id} — {self.score}★'
+
 
 class Comment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    video_id = models.CharField(max_length=100)
+    """Per-video comment from a logged-in user."""
+    user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    video_id    = models.CharField(max_length=20)
     video_title = models.CharField(max_length=255, blank=True)
-    body = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.username} on {self.video_title}"
-    
-class WellnessRating(models.Model):
-    """Stores a user's star rating after watching recommended videos."""
-
-    emotion_selected = models.CharField(
-        max_length=20,
-        choices=EMOTION_CHOICES,
-        verbose_name='Emotion Selected',
-    )
-    rating_score = models.PositiveSmallIntegerField(
-        choices=[(i, f'{i} {"star" if i == 1 else "stars"}') for i in range(6)],
-        verbose_name='Rating Score (0–5)',
-    )
-    timestamp = models.DateTimeField(
-        default=timezone.now,
-        verbose_name='Submitted At',
-    )
-    # Optional: store which videos were shown (comma-separated YouTube IDs)
-    video_ids = models.TextField(
-        blank=True,
-        verbose_name='Video IDs Shown',
-        help_text='Comma-separated YouTube video IDs that were recommended.',
-    )
-    session_key = models.CharField(
-        max_length=40,
-        blank=True,
-        verbose_name='Session Key',
-    )
+    body        = models.TextField(max_length=500)
+    created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-timestamp']
-        verbose_name = 'Wellness Rating'
-        verbose_name_plural = 'Wellness Ratings'
+        ordering     = ['-created_at']
+        verbose_name = 'Video Comment'
 
     def __str__(self):
-        return (
-            f'{self.get_emotion_selected_display()} — '
-            f'{self.rating_score}★ — '
-            f'{self.timestamp.strftime("%Y-%m-%d %H:%M")}'
-        )
-
-    def star_display(self):
-        return '★' * self.rating_score + '☆' * (5 - self.rating_score)
+        preview = self.body[:40] + ('…' if len(self.body) > 40 else '')
+        return f'{self.user.username} on {self.video_id}: "{preview}"'
