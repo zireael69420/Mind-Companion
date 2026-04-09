@@ -52,6 +52,17 @@
     .mc-input:focus { border-color:var(--purple); box-shadow:0 0 0 3px rgba(133,112,207,0.15); }
     .error-list { list-style:none; margin-top:0.3rem; }
     .error-list li { font-size:0.72rem; color:#E05C6A; margin-top:0.15rem; }
+
+    /* Password field with eye toggle */
+    .pw-wrap { position:relative; }
+    .pw-wrap .mc-input { padding-right:2.6rem; }
+    .eye-btn {
+      position:absolute; right:0.75rem; top:50%; transform:translateY(-50%);
+      background:none; border:none; cursor:pointer; padding:0;
+      color:var(--muted); line-height:1; transition:color 0.18s;
+    }
+    .eye-btn:hover { color:var(--purple); }
+    .eye-btn svg { width:18px; height:18px; display:block; }
     .password-hint {
       background:rgba(133,112,207,0.07); border:1px solid rgba(133,112,207,0.2);
       border-radius:10px; padding:0.65rem 0.8rem; margin-bottom:1.2rem;
@@ -129,7 +140,14 @@
 
     <div class="field">
       <label for="{{ form.password1.id_for_label }}">Password</label>
-      {{ form.password1 }}
+      <div class="pw-wrap">
+        {{ form.password1 }}
+        <button type="button" class="eye-btn" onclick="togglePw('{{ form.password1.id_for_label }}', this)" aria-label="Show password">
+          <svg id="eye-icon-pw1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
       {% if form.password1.errors %}
         <ul class="error-list">{% for e in form.password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
       {% endif %}
@@ -137,7 +155,14 @@
 
     <div class="field">
       <label for="{{ form.password2.id_for_label }}">Confirm Password</label>
-      {{ form.password2 }}
+      <div class="pw-wrap">
+        {{ form.password2 }}
+        <button type="button" class="eye-btn" onclick="togglePw('{{ form.password2.id_for_label }}', this)" aria-label="Show password">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
       {% if form.password2.errors %}
         <ul class="error-list">{% for e in form.password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
       {% endif %}
@@ -149,5 +174,21 @@
   <div class="divider">Already have an account?</div>
   <a href="{% url 'wellness:login' %}" class="link-btn">Log In</a>
 </div>
+<script>
+function togglePw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  // Swap between open-eye and crossed-eye SVG
+  btn.querySelector('svg').innerHTML = isHidden
+    ? /* eye-off */
+      '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>' +
+      '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>' +
+      '<line x1="1" y1="1" x2="23" y2="23"/>'
+    : /* eye */
+      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+}
+</script>
 </body>
 </html>

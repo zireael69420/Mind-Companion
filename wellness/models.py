@@ -29,9 +29,7 @@ class WellnessRating(models.Model):
 
 
 class VideoRating(models.Model):
-    """Per-video star rating tied to a logged-in user.
-    unique_together enforces one rating per user per video.
-    Re-rating uses update_or_create so it updates instead of duplicating."""
+    """Per-video star rating tied to a logged-in user."""
     user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_ratings')
     video_id    = models.CharField(max_length=20)
     video_title = models.CharField(max_length=255, blank=True)
@@ -65,3 +63,32 @@ class Comment(models.Model):
     def __str__(self):
         preview = self.body[:40] + ('…' if len(self.body) > 40 else '')
         return f'{self.user.username} on {self.video_id}: "{preview}"'
+
+
+class EmailVerification(models.Model):
+    """
+    One-time 6-digit code sent to the user's email on first login
+    (or whenever 2FA is triggered).
+
+    Codes expire after 10 minutes (checked in the view).
+    Only one active (unused) code per user is kept — older ones are
+    deleted when a new one is issued.
+    """
+    user       = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='email_verifications'
+    )
+    code       = models.CharField(max_length=6)
+    created_at = models.DateTimeField(default=timezone.now)
+    is_used    = models.BooleanField(default=False)
+
+    class Meta:
+        ordering     = ['-created_at']
+        verbose_name = 'Email Verification Code'
+
+    def is_expired(self):
+        from datetime import timedelta
+        return timezone.now() > self.created_at + timedelta(minutes=10)
+
+    def __str__(self):
+        status = 'used' if self.is_used else ('expired' if self.is_expired() else 'active')
+        return f'{self.user.username} — {self.code} ({status})'

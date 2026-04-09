@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mind Companion — Verify Your Email</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    :root { --ink:#3D2C35; --muted:#9B8EA0; --cream:#FFF8F0; --purple:#8570CF; }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body {
+      font-family:'DM Sans',sans-serif; background:var(--cream); min-height:100vh;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; padding:1.5rem;
+    }
+    .bg-mesh {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(ellipse 70% 55% at 15% 20%, #FFE4EC44 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 15%, #D4F5EC44 0%, transparent 55%),
+        radial-gradient(ellipse 55% 60% at 80% 85%, #E8D5F544 0%, transparent 60%),
+        var(--cream);
+    }
+    .card {
+      position:relative; z-index:2;
+      background:rgba(255,255,255,0.85); backdrop-filter:blur(12px);
+      border:1.5px solid rgba(255,255,255,0.95); border-radius:28px;
+      padding:2.5rem 2rem; width:100%; max-width:420px;
+      box-shadow:0 16px 48px rgba(0,0,0,0.1); text-align:center;
+    }
+    .brand {
+      font-family:'Baloo 2',sans-serif; font-weight:900; font-size:1.15rem;
+      color:var(--purple); text-decoration:none;
+      display:flex; align-items:center; gap:0.35rem;
+      justify-content:center; margin-bottom:1.5rem;
+    }
+    .shield { font-size:2.8rem; margin-bottom:0.6rem; }
+    h1 {
+      font-family:'Baloo 2',sans-serif; font-weight:900; font-size:1.5rem;
+      color:var(--ink); margin-bottom:0.4rem;
+    }
+    .sub {
+      font-size:0.82rem; color:var(--muted); margin-bottom:0.35rem; line-height:1.5;
+    }
+    .email-hint {
+      font-size:0.8rem; font-weight:600; color:var(--purple);
+      background:rgba(133,112,207,0.08); border-radius:8px;
+      padding:0.4rem 0.9rem; display:inline-block; margin-bottom:1.6rem;
+    }
+    .field { margin-bottom:1.1rem; text-align:left; }
+    label { display:block; font-size:0.78rem; font-weight:500; color:var(--ink); margin-bottom:0.35rem; }
+    .mc-input {
+      width:100%; padding:0.65rem 0.9rem;
+      border:1.5px solid #E8DFF0; border-radius:12px;
+      font-family:'DM Sans',sans-serif; font-size:0.88rem; color:var(--ink);
+      background:rgba(255,255,255,0.9); outline:none;
+      transition:border-color 0.2s, box-shadow 0.2s;
+    }
+    .mc-input:focus { border-color:var(--purple); box-shadow:0 0 0 3px rgba(133,112,207,0.15); }
+
+    /* Large centred code input */
+    .code-input {
+      text-align:center; font-size:1.6rem; font-weight:700;
+      letter-spacing:0.35em; padding:0.75rem 1rem;
+    }
+
+    .error-list { list-style:none; margin-top:0.3rem; }
+    .error-list li { font-size:0.72rem; color:#E05C6A; margin-top:0.15rem; }
+    .submit-btn {
+      width:100%; padding:0.85rem;
+      background:linear-gradient(135deg,#8570CF,#C7A0EA); color:white;
+      font-family:'Baloo 2',sans-serif; font-weight:800; font-size:0.95rem;
+      border:none; border-radius:999px; cursor:pointer;
+      box-shadow:0 5px 18px rgba(133,112,207,0.35);
+      transition:transform 0.18s, box-shadow 0.18s;
+    }
+    .submit-btn:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(133,112,207,0.45); }
+    .resend-row { margin-top:1.1rem; font-size:0.78rem; color:var(--muted); }
+    .resend-link {
+      color:var(--purple); text-decoration:none; font-weight:600;
+      transition:opacity 0.18s;
+    }
+    .resend-link:hover { opacity:0.75; text-decoration:underline; }
+    .back-link {
+      display:block; margin-top:0.85rem; font-size:0.74rem;
+      color:var(--muted); text-decoration:none; transition:color 0.18s;
+    }
+    .back-link:hover { color:var(--ink); }
+    .alert-msg {
+      border-radius:10px; padding:0.65rem 0.8rem; margin-bottom:1.2rem;
+      font-size:0.78rem; text-align:left;
+    }
+    .alert-msg.success { background:#EAF6ED; border:1px solid #B5DFC0; color:#1A5C2A; }
+    .alert-msg.error   { background:#FEE8EA; border:1px solid #F5C6CB; color:#842029; }
+
+    /* Countdown timer */
+    #timer { font-size:0.72rem; color:var(--muted); margin-top:0.5rem; }
+    #timer.urgent { color:#E05C6A; font-weight:600; }
+  </style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+
+<div class="card">
+  <a href="{% url 'wellness:landing' %}" class="brand">🌸 Mind Companion</a>
+  <div class="shield">🔐</div>
+  <h1>Check your email</h1>
+  <p class="sub">We sent a 6-digit verification code to</p>
+  <span class="email-hint">{{ masked_email }}</span>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert-msg {% if message.tags == 'success' %}success{% else %}error{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="field">
+      <label for="{{ form.code.id_for_label }}">Verification code</label>
+      {{ form.code }}
+      {% if form.code.errors %}
+        <ul class="error-list">{% for e in form.code.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="submit-btn">Verify &amp; Log In ✨</button>
+  </form>
+
+  <div id="timer"></div>
+
+  <div class="resend-row">
+    Didn't receive it?
+    <a href="{% url 'wellness:resend_code' %}" class="resend-link">Send a new code</a>
+  </div>
+
+  <a href="{% url 'wellness:login' %}" class="back-link">← Back to login</a>
+</div>
+
+<script>
+// 10-minute countdown matching the server-side expiry
+let seconds = 10 * 60;
+const timerEl = document.getElementById('timer');
+
+function tick() {
+  if (seconds <= 0) {
+    timerEl.textContent = 'Code expired — please request a new one.';
+    timerEl.classList.add('urgent');
+    return;
+  }
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  timerEl.textContent = `Code expires in ${m}:${String(s).padStart(2, '0')}`;
+  if (seconds <= 60) timerEl.classList.add('urgent');
+  seconds--;
+  setTimeout(tick, 1000);
+}
+tick();
+
+// Auto-submit when 6 digits are typed
+document.querySelector('.code-input').addEventListener('input', function() {
+  if (this.value.replace(/\D/g, '').length === 6) {
+    this.value = this.value.replace(/\D/g, '');
+    this.closest('form').submit();
+  }
+});
+</script>
+</body>
+</html>

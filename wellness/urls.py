@@ -21,6 +21,10 @@ urlpatterns = [
     path('login/',                         views.login_view,          name='login'),
     path('logout/',                        views.logout_view,         name='logout'),
 
+    # 2FA
+    path('verify-email/',                  views.verify_email_view,   name='verify_email'),
+    path('resend-code/',                   views.resend_code_view,    name='resend_code'),
+
     # Per-video feedback (AJAX POST)
     path('video-rating/',                  views.submit_video_rating, name='submit_video_rating'),
     path('video-comment/',                 views.submit_comment,      name='submit_comment'),

@@ -1,15 +1,17 @@
 import os
 from pathlib import Path
 
+import dj_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-me-in-production')
 DEBUG      = os.environ.get('DEBUG', 'False') == 'True'
+
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 
-# Accept all *.onrender.com subdomains automatically so the deployed app never
-# returns a 400 Bad Request (which gunicorn surfaces as a 502 Bad Gateway).
-# This is safe because Django's CSRF and session protection still applies.
+# Render injects this variable automatically — it is the app's public hostname.
+# Without it, every request is rejected with 400 → gunicorn shows 502.
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -40,8 +42,7 @@ ROOT_URLCONF = 'mental_wellness.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # project-level templates/ folder (holds registration/register.html etc.)
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'],   # project-level templates/registration/
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -58,9 +59,7 @@ WSGI_APPLICATION = 'mental_wellness.wsgi.application'
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Uses DATABASE_URL env var on Render (PostgreSQL).
-# Falls back to SQLite when DATABASE_URL is not set (local dev).
-import dj_database_url
-
+# Falls back to SQLite locally when DATABASE_URL is not set.
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
@@ -93,7 +92,22 @@ STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# ── API keys (set in Render environment variables — never hardcode) ───────────
+# ── Email — used for 2FA verification codes ───────────────────────────────────
+# Backend: Gmail SMTP via TLS.
+# Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD as Render environment variables.
+#
+# EMAIL_HOST_PASSWORD must be a Gmail App Password, NOT your regular password.
+# Generate one at: https://myaccount.google.com/apppasswords
+# (Gmail account must have 2-Step Verification enabled first.)
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp.gmail.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL  = os.environ.get('EMAIL_HOST_USER', 'noreply@mindcompanion.app')
+
+# ── API keys ──────────────────────────────────────────────────────────────────
 YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 

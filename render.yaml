@@ -12,6 +12,12 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.0"
       - key: YOUTUBE_API_KEY
-        sync: false      # set manually in Render dashboard
+        sync: false           # set manually in Render dashboard
       - key: ANTHROPIC_API_KEY
-        sync: false      # set manually in Render dashboard
+        sync: false           # set manually in Render dashboard
+      - key: DATABASE_URL
+        sync: false           # set manually — use Internal Database URL from Render PostgreSQL
+      - key: EMAIL_HOST_USER
+        sync: false           # your Gmail address e.g. yourapp@gmail.com
+      - key: EMAIL_HOST_PASSWORD
+        sync: false           # Gmail App Password from myaccount.google.com/apppasswords

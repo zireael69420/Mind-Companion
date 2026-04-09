@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Comment, VideoRating, WellnessRating
+from .models import Comment, EmailVerification, VideoRating, WellnessRating
 
 
 @admin.register(WellnessRating)
@@ -32,3 +32,20 @@ class CommentAdmin(admin.ModelAdmin):
     @admin.display(description='Comment preview')
     def short_body(self, obj):
         return obj.body[:60] + ('…' if len(obj.body) > 60 else '')
+
+
+@admin.register(EmailVerification)
+class EmailVerificationAdmin(admin.ModelAdmin):
+    list_display    = ('user', 'code', 'created_at', 'is_used', 'status')
+    list_filter     = ('is_used',)
+    search_fields   = ('user__username', 'user__email')
+    readonly_fields = ('code', 'created_at', 'user')
+    ordering        = ('-created_at',)
+
+    @admin.display(description='Status')
+    def status(self, obj):
+        if obj.is_used:
+            return '✅ Used'
+        if obj.is_expired():
+            return '⏰ Expired'
+        return '🟢 Active'

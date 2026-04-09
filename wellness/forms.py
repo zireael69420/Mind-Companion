@@ -53,6 +53,33 @@ class RegisterForm(UserCreationForm):
         return user
 
 
+class VerifyCodeForm(forms.Form):
+    code = forms.CharField(
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={
+            'class':         'mc-input code-input',
+            'placeholder':   '000000',
+            'autocomplete':  'one-time-code',
+            'inputmode':     'numeric',
+            'pattern':       '[0-9]{6}',
+            'maxlength':     '6',
+        }),
+        label='Verification code',
+        error_messages={
+            'required':  'Please enter the 6-digit code.',
+            'min_length': 'The code must be exactly 6 digits.',
+            'max_length': 'The code must be exactly 6 digits.',
+        },
+    )
+
+    def clean_code(self):
+        code = self.cleaned_data.get('code', '').strip()
+        if not code.isdigit():
+            raise forms.ValidationError('The code must contain digits only.')
+        return code
+
+
 class CommentForm(forms.ModelForm):
     class Meta:
         model  = Comment

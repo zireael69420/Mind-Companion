@@ -1,19 +1,22 @@
 import html
 import json
 import logging
+import random
 import re
+import string
 
 import requests
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
+from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import RegisterForm
-from .models import Comment, VideoRating, WellnessRating
+from .forms import RegisterForm, VerifyCodeForm
+from .models import Comment, EmailVerification, VideoRating, WellnessRating
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +200,38 @@ def get_videos_for_emotion(emotion):
     return videos[:TARGET_VIDEOS]
 
 
+# ── 2FA helpers ───────────────────────────────────────────────────────────────
+
+def _generate_code():
+    """Return a random 6-digit string."""
+    return ''.join(random.choices(string.digits, k=6))
+
+
+def _send_verification_email(user, code):
+    """Send the 6-digit code to the user's registered email address."""
+    send_mail(
+        subject='Your Mind Companion verification code',
+        message=(
+            f'Hi {user.username},\n\n'
+            f'Your verification code is: {code}\n\n'
+            f'It expires in 10 minutes. If you did not request this, '
+            f'you can safely ignore this email.\n\n'
+            f'— Mind Companion'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+def _issue_code(user):
+    """Delete any previous unused codes and create a fresh one."""
+    EmailVerification.objects.filter(user=user, is_used=False).delete()
+    code = _generate_code()
+    EmailVerification.objects.create(user=user, code=code)
+    return code
+
+
 # ── Auth views ────────────────────────────────────────────────────────────────
 
 def register_view(request):
@@ -206,6 +241,8 @@ def register_view(request):
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
+            # Issue a verification code immediately after registration
+            # so the first login triggers 2FA
             login(request, user)
             messages.success(request, f'Welcome to Mind Companion, {user.username}! 🌸')
             return redirect('wellness:landing')
@@ -221,16 +258,114 @@ def login_view(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            login(request, user)
-            next_url = request.GET.get('next', '')
-            if next_url and next_url.startswith('/'):
-                return redirect(next_url)
-            return redirect('wellness:landing')
+            # ── 2FA: store user id in session and send code ───────────────
+            if not user.email:
+                # No email on account — skip 2FA and log straight in
+                login(request, user)
+                return _safe_redirect(request)
+
+            try:
+                code = _issue_code(user)
+                _send_verification_email(user, code)
+            except Exception as e:
+                logger.error('Failed to send 2FA email to %s: %s', user.username, e)
+                # If email sending fails, log the user in anyway so the
+                # app remains usable — change this to a hard block if needed
+                login(request, user)
+                messages.warning(request, 'Could not send verification email. Logged in without 2FA.')
+                return _safe_redirect(request)
+
+            # Park the user id in the session — they are NOT logged in yet
+            request.session['2fa_user_id'] = user.pk
+            request.session['2fa_next']    = request.GET.get('next', '')
+            return redirect('wellness:verify_email')
         else:
             messages.error(request, 'Invalid username or password.')
     else:
         form = AuthenticationForm()
     return render(request, 'registration/login.html', {'form': form})
+
+
+def _safe_redirect(request):
+    next_url = request.GET.get('next', '')
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('wellness:landing')
+
+
+def verify_email_view(request):
+    """
+    The user has passed the password check. They now need to enter the
+    6-digit code that was emailed to them.
+    """
+    user_id = request.session.get('2fa_user_id')
+    if not user_id:
+        # No pending 2FA — send back to login
+        return redirect('wellness:login')
+
+    from django.contrib.auth.models import User
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return redirect('wellness:login')
+
+    # Mask the email for display: show only first 2 chars + domain
+    email = user.email
+    parts = email.split('@')
+    masked = parts[0][:2] + '***@' + parts[1] if len(parts) == 2 else '***'
+
+    if request.method == 'POST':
+        form = VerifyCodeForm(request.POST)
+        if form.is_valid():
+            entered = form.cleaned_data['code'].strip()
+            try:
+                record = EmailVerification.objects.get(
+                    user=user, code=entered, is_used=False
+                )
+            except EmailVerification.DoesNotExist:
+                form.add_error('code', 'Invalid code. Please try again.')
+                return render(request, 'registration/verify_email.html',
+                              {'form': form, 'masked_email': masked})
+
+            if record.is_expired():
+                form.add_error('code', 'This code has expired. Please log in again to get a new one.')
+                return render(request, 'registration/verify_email.html',
+                              {'form': form, 'masked_email': masked})
+
+            # Mark used and complete login
+            record.is_used = True
+            record.save()
+            del request.session['2fa_user_id']
+            next_url = request.session.pop('2fa_next', '')
+            login(request, user)
+            if next_url and next_url.startswith('/'):
+                return redirect(next_url)
+            return redirect('wellness:landing')
+    else:
+        form = VerifyCodeForm()
+
+    return render(request, 'registration/verify_email.html',
+                  {'form': form, 'masked_email': masked})
+
+
+def resend_code_view(request):
+    """Resend a fresh verification code to the user's email."""
+    user_id = request.session.get('2fa_user_id')
+    if not user_id:
+        return redirect('wellness:login')
+    from django.contrib.auth.models import User
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return redirect('wellness:login')
+    try:
+        code = _issue_code(user)
+        _send_verification_email(user, code)
+        messages.success(request, 'A new code has been sent to your email.')
+    except Exception as e:
+        logger.error('Failed to resend 2FA email: %s', e)
+        messages.error(request, 'Could not send email. Please try again.')
+    return redirect('wellness:verify_email')
 
 
 def logout_view(request):
@@ -276,7 +411,6 @@ def select_emotion(request):
 
 @require_POST
 def submit_rating(request):
-    """Legacy session-level rating for the thank-you page flow."""
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -342,9 +476,8 @@ def submit_video_rating(request):
         defaults={'score': score, 'video_title': video_title},
     )
     return JsonResponse({
-        'success': True,
-        'created': created,
-        'score':   obj.score,
+        'success': True, 'created': created,
+        'score': obj.score,
         'message': 'Rating saved!' if created else 'Rating updated!',
     })
 
@@ -371,10 +504,10 @@ def submit_comment(request):
         video_title=video_title, body=body,
     )
     return JsonResponse({
-        'success':  True,
+        'success': True,
         'username': request.user.username,
-        'body':     comment.body,
-        'time':     comment.created_at.strftime('%b %d, %Y'),
+        'body': comment.body,
+        'time': comment.created_at.strftime('%b %d, %Y'),
     })
 
 
@@ -404,8 +537,8 @@ def get_video_feedback(request):
         except VideoRating.DoesNotExist:
             pass
     return JsonResponse({
-        'comments':   comments,
+        'comments': comments,
         'user_score': user_score,
-        'logged_in':  request.user.is_authenticated,
-        'username':   request.user.username if request.user.is_authenticated else '',
+        'logged_in': request.user.is_authenticated,
+        'username': request.user.username if request.user.is_authenticated else '',
     })
