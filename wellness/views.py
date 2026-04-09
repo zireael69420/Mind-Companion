@@ -258,27 +258,32 @@ def login_view(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            # ── 2FA: store user id in session and send code ───────────────
+
+            # Skip 2FA if the user has no email on their account
             if not user.email:
-                # No email on account — skip 2FA and log straight in
                 login(request, user)
                 return _safe_redirect(request)
 
             try:
                 code = _issue_code(user)
                 _send_verification_email(user, code)
-            except Exception as e:
-                logger.error('Failed to send 2FA email to %s: %s', user.username, e)
-                # If email sending fails, log the user in anyway so the
-                # app remains usable — change this to a hard block if needed
-                login(request, user)
-                messages.warning(request, 'Could not send verification email. Logged in without 2FA.')
-                return _safe_redirect(request)
+                # Code sent — park user id and redirect to verify page
+                request.session['2fa_user_id'] = user.pk
+                request.session['2fa_next']    = request.GET.get('next', '')
+                return redirect('wellness:verify_email')
 
-            # Park the user id in the session — they are NOT logged in yet
-            request.session['2fa_user_id'] = user.pk
-            request.session['2fa_next']    = request.GET.get('next', '')
-            return redirect('wellness:verify_email')
+            except Exception as e:
+                # Covers: missing DB table, SMTP not configured, network error.
+                # Log the error and fall back to a direct login so the app
+                # stays usable while 2FA is being set up.
+                logger.error('2FA failed for %s (%s: %s) — logging in without 2FA',
+                             user.username, type(e).__name__, e)
+                login(request, user)
+                messages.warning(
+                    request,
+                    'Verification email could not be sent. Logged in without 2FA.'
+                )
+                return _safe_redirect(request)
         else:
             messages.error(request, 'Invalid username or password.')
     else:

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import ProgrammingError, OperationalError
 
 from .models import Comment, EmailVerification, VideoRating, WellnessRating
 
@@ -41,6 +42,13 @@ class EmailVerificationAdmin(admin.ModelAdmin):
     search_fields   = ('user__username', 'user__email')
     readonly_fields = ('code', 'created_at', 'user')
     ordering        = ('-created_at',)
+
+    def get_queryset(self, request):
+        """Return empty queryset gracefully if the table doesn't exist yet."""
+        try:
+            return super().get_queryset(request)
+        except (ProgrammingError, OperationalError):
+            return EmailVerification.objects.none()
 
     @admin.display(description='Status')
     def status(self, obj):
