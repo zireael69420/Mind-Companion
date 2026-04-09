@@ -7,6 +7,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-me-in-producti
 DEBUG      = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 
+# Accept all *.onrender.com subdomains automatically so the deployed app never
+# returns a 400 Bad Request (which gunicorn surfaces as a 502 Bad Gateway).
+# This is safe because Django's CSRF and session protection still applies.
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
