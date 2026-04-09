@@ -41,7 +41,13 @@
     }
     .sub { font-size:0.82rem; color:var(--muted); text-align:center; margin-bottom:1.8rem; font-style:italic; }
     .field { margin-bottom:1.1rem; }
-    label { display:block; font-size:0.78rem; font-weight:500; color:var(--ink); margin-bottom:0.35rem; }
+    .field-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; }
+    label { font-size:0.78rem; font-weight:500; color:var(--ink); }
+    .forgot-link {
+      font-size:0.72rem; color:var(--purple); text-decoration:none;
+      transition:opacity 0.18s;
+    }
+    .forgot-link:hover { opacity:0.7; text-decoration:underline; }
     .mc-input {
       width:100%; padding:0.65rem 0.9rem;
       border:1.5px solid #E8DFF0; border-radius:12px;
@@ -63,6 +69,7 @@
     }
     .eye-btn:hover { color:var(--purple); }
     .eye-btn svg { width:18px; height:18px; display:block; }
+
     .submit-btn {
       width:100%; padding:0.85rem;
       background:linear-gradient(135deg,#8570CF,#C7A0EA); color:white;
@@ -121,13 +128,18 @@
     </div>
 
     <div class="field">
-      <label for="id_password">Password</label>
+      <div class="field-header">
+        <label for="id_password">Password</label>
+        <a href="{% url 'wellness:password_reset' %}" class="forgot-link">Forgot password?</a>
+      </div>
       <div class="pw-wrap">
         <input type="password" name="password" id="id_password"
                class="mc-input" placeholder="Your password" autocomplete="current-password"/>
         <button type="button" class="eye-btn" onclick="togglePw('id_password', this)" aria-label="Show password">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
       </div>
@@ -142,6 +154,7 @@
   <div class="divider">Don't have an account?</div>
   <a href="{% url 'wellness:register' %}" class="link-btn">Create Account</a>
 </div>
+
 <script>
 function togglePw(inputId, btn) {
   const input = document.getElementById(inputId);
@@ -155,7 +168,5 @@ function togglePw(inputId, btn) {
   btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
 }
 </script>
-
-{% include "partials/tab_sync.html" %}
 </body>
 </html>
