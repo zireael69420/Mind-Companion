@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Create Account — Mellow{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-12">
+  <div class="w-full max-w-md">
+
+    <!-- Card -->
+    <div class="card rounded-3xl shadow-xl p-8 animate-fade-in">
+
+      <!-- Header -->
+      <div class="text-center mb-8">
+        <div class="text-5xl mb-3">🌸</div>
+        <h1 class="font-display font-800 text-2xl text-gray-700">Create Your Account</h1>
+        <p class="text-sm text-gray-400 font-body mt-1">Join Mellow and start your wellness journey</p>
+      </div>
+
+      <!-- Form -->
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Non-field errors -->
+        {% if form.non_field_errors %}
+        <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Username -->
+        <div class="mb-4">
+          <label class="block text-sm font-body font-600 text-gray-600 mb-1" for="{{ form.username.id_for_label }}">
+            Username
+          </label>
+          {{ form.username }}
+          {% if form.username.errors %}
+          <p class="mt-1 text-xs text-red-500">{{ form.username.errors|join:", " }}</p>
+          {% endif %}
+          <p class="mt-1 text-xs text-gray-400">{{ form.username.help_text }}</p>
+        </div>
+
+        <!-- Email -->
+        <div class="mb-4">
+          <label class="block text-sm font-body font-600 text-gray-600 mb-1" for="{{ form.email.id_for_label }}">
+            Email
+          </label>
+          {{ form.email }}
+          {% if form.email.errors %}
+          <p class="mt-1 text-xs text-red-500">{{ form.email.errors|join:", " }}</p>
+          {% endif %}
+          <p class="mt-1 text-xs text-gray-400">{{ form.email.help_text }}</p>
+        </div>
+
+        <!-- Password -->
+        <div class="mb-4">
+          <label class="block text-sm font-body font-600 text-gray-600 mb-1" for="{{ form.password1.id_for_label }}">
+            Password
+          </label>
+          {{ form.password1 }}
+          {% if form.password1.errors %}
+          <p class="mt-1 text-xs text-red-500">{{ form.password1.errors|join:", " }}</p>
+          {% endif %}
+          <!-- Password requirements hint -->
+          <div class="mt-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 font-body">
+            🔒 <strong>Strong password required:</strong> at least 8 characters, not a common word, and not all numbers.
+          </div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="mb-6">
+          <label class="block text-sm font-body font-600 text-gray-600 mb-1" for="{{ form.password2.id_for_label }}">
+            Confirm Password
+          </label>
+          {{ form.password2 }}
+          {% if form.password2.errors %}
+          <p class="mt-1 text-xs text-red-500">{{ form.password2.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Submit -->
+        <button type="submit"
+          class="w-full py-3 rounded-2xl bg-rose-400 hover:bg-rose-500 text-white font-display font-700 text-base transition-all shadow-md hover:shadow-lg active:scale-95">
+          Create Account 🌸
+        </button>
+      </form>
+
+      <!-- Login link -->
+      <p class="text-center text-sm text-gray-400 font-body mt-6">
+        Already have an account?
+        <a href="{% url 'wellness:login' %}" class="text-rose-400 hover:text-rose-500 font-600 transition-colors">Log in here</a>
+      </p>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

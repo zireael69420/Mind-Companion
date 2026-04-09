@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Log In — Mellow{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-12">
+  <div class="w-full max-w-md">
+
+    <!-- Card -->
+    <div class="card rounded-3xl shadow-xl p-8 animate-fade-in">
+
+      <!-- Header -->
+      <div class="text-center mb-8">
+        <div class="text-5xl mb-3">💙</div>
+        <h1 class="font-display font-800 text-2xl text-gray-700">Welcome Back</h1>
+        <p class="text-sm text-gray-400 font-body mt-1">Log in to continue your wellness journey</p>
+      </div>
+
+      <!-- Form -->
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Non-field errors -->
+        {% if form.non_field_errors %}
+        <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">
+          {% for error in form.non_field_errors %}
+            <p>⚠️ {{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Username -->
+        <div class="mb-4">
+          <label class="block text-sm font-body font-600 text-gray-600 mb-1" for="{{ form.username.id_for_label }}">
+            Username
+          </label>
+          <input
+            type="text"
+            name="username"
+            id="{{ form.username.id_for_label }}"
+            autocomplete="username"
+            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/70 font-body"
+            placeholder="Your username"
+            value="{{ form.username.value|default:'' }}"
+          />
+          {% if form.username.errors %}
+          <p class="mt-1 text-xs text-red-500">{{ form.username.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Password -->
+        <div class="mb-6">
+          <label class="block text-sm font-body font-600 text-gray-600 mb-1" for="{{ form.password.id_for_label }}">
+            Password
+          </label>
+          <input
+            type="password"
+            name="password"
+            id="{{ form.password.id_for_label }}"
+            autocomplete="current-password"
+            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white/70 font-body"
+            placeholder="Your password"
+          />
+          {% if form.password.errors %}
+          <p class="mt-1 text-xs text-red-500">{{ form.password.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Submit -->
+        <button type="submit"
+          class="w-full py-3 rounded-2xl bg-rose-400 hover:bg-rose-500 text-white font-display font-700 text-base transition-all shadow-md hover:shadow-lg active:scale-95">
+          Log In 💙
+        </button>
+      </form>
+
+      <!-- Register link -->
+      <p class="text-center text-sm text-gray-400 font-body mt-6">
+        Don't have an account?
+        <a href="{% url 'wellness:register' %}" class="text-rose-400 hover:text-rose-500 font-600 transition-colors">Create one here</a>
+      </p>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

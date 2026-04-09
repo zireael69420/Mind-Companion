@@ -7,10 +7,14 @@ import re
 
 import requests
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import AuthenticationForm
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from .forms import RegisterForm
 from .models import WellnessRating
 
 logger = logging.getLogger(__name__)
@@ -268,6 +272,49 @@ def get_videos_for_emotion(emotion: str) -> list[dict]:
                 break
 
     return videos[:TARGET_VIDEOS]
+
+
+# ── Auth views ────────────────────────────────────────────────────────────────
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('wellness:landing')
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'Welcome to Mellow, {user.username}! 🌸')
+            return redirect('wellness:landing')
+    else:
+        form = RegisterForm()
+    return render(request, 'wellness/register.html', {'form': form})
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('wellness:landing')
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(request, f'Welcome back, {user.username}! 🌸')
+            next_url = request.GET.get('next', '')
+            if next_url and next_url.startswith('/'):
+                return redirect(next_url)
+            return redirect('wellness:landing')
+        else:
+            messages.error(request, 'Invalid username or password. Please try again.')
+    else:
+        form = AuthenticationForm(request)
+    return render(request, 'wellness/login.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    messages.success(request, 'You have been logged out. Take care! 💙')
+    return redirect('wellness:landing')
 
 
 # ── Views ─────────────────────────────────────────────────────────────────────
