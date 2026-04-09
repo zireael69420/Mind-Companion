@@ -67,7 +67,8 @@ WSGI_APPLICATION = 'mental_wellness.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600,
+        conn_max_age=60,          # <-- Changed from 600 to 60
+        conn_health_checks=True,
     )
 }
 
@@ -198,3 +199,9 @@ LOGGING = {
         },
     },
 }
+
+# Optimizing password hashing for free-tier CPU constraints
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+]
+PBKDF2_ITERATIONS = 200000
