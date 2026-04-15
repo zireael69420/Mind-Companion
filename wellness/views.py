@@ -254,20 +254,27 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             if not user.email:
+                # No email on account — skip 2FA and log straight in
                 login(request, user)
                 return _safe_redirect(request)
             try:
                 code = _issue_code(user)
                 _send_verification_email(user, code)
+                # Code sent — park user id and redirect to verify page.
+                # The user is NOT logged in yet at this point.
                 request.session['2fa_user_id'] = user.pk
                 request.session['2fa_next']    = request.GET.get('next', '')
                 return redirect('wellness:verify_email')
             except Exception as e:
-                logger.error('2FA failed for %s (%s: %s) — logging in without 2FA',
+                # FAIL CLOSED — any error sending the 2FA code must NOT
+                # log the user in. Re-render the login form with an error.
+                logger.error('2FA send failed for %s (%s: %s)',
                              user.username, type(e).__name__, e)
-                login(request, user)
-                messages.warning(request, 'Verification email could not be sent. Logged in without 2FA.')
-                return _safe_redirect(request)
+                messages.error(
+                    request,
+                    'Unable to send 2FA verification code. Please try again later.'
+                )
+                return render(request, 'registration/login.html', {'form': form})
         else:
             messages.error(request, 'Invalid username or password.')
     else:

@@ -10,7 +10,8 @@ DEBUG      = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 
-# Render injects this automatically — it is the app's public hostname.
+# Render injects RENDER_EXTERNAL_HOSTNAME automatically.
+# Without it every request is rejected with 400 → gunicorn shows 502.
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -22,13 +23,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'anymail',    # ← required for django-anymail
+    'anymail',
     'wellness',
 ]
 
+# ── Middleware ────────────────────────────────────────────────────────────────
+# ORDER IS MANDATORY:
+#   1. SecurityMiddleware  — must be first
+#   2. WhiteNoiseMiddleware — must be immediately after Security, before everything else
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',   # serves static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -42,7 +47,7 @@ ROOT_URLCONF = 'mental_wellness.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'],  # project-level templates/registration/
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -58,6 +63,8 @@ TEMPLATES = [
 WSGI_APPLICATION = 'mental_wellness.wsgi.application'
 
 # ── Database ──────────────────────────────────────────────────────────────────
+# Uses DATABASE_URL env var on Render (Neon PostgreSQL).
+# Falls back to SQLite locally when DATABASE_URL is not set.
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
@@ -86,12 +93,26 @@ USE_I18N      = True
 USE_TZ        = True
 
 # ── Static files ─────────────────────────────────────────────────────────────
+#
+# STATIC_URL   : URL prefix used in {% static '...' %} template tags.
+# STATIC_ROOT  : Absolute path where collectstatic copies every static file.
+#                WhiteNoise serves files from here in production.
+# STORAGES     : Django 4.2+ way to configure storage backends.
+#                CompressedManifestStaticFilesStorage adds a content-hash to
+#                filenames (e.g. admin.css → admin.abc123.css) for cache-busting.
+#
+# WHITENOISE_MANIFEST_STRICT = False  ← THE KEY FIX
+#   By default, CompressedManifestStaticFilesStorage raises ValueError when any
+#   file referenced inside a CSS or JS file is not found in the manifest.
+#   Django admin's CSS references font files (.woff2 etc.) that are sometimes
+#   absent from the manifest after collectstatic runs on certain platforms.
+#   Setting this to False makes WhiteNoise skip missing files instead of crashing,
+#   which eliminates the 500 on every admin page click.
+
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Django 4.2+ / whitenoise 6 correct way to configure storage.
-# WHITENOISE_MANIFEST_STRICT = False prevents ValueError on admin font
-# references that are absent from the manifest after collectstatic.
+# Django 5 / whitenoise 6 correct way — replaces deprecated STATICFILES_STORAGE
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -100,41 +121,27 @@ STORAGES = {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
 }
+
+# Do NOT raise ValueError for manifest misses (admin fonts, etc.)
 WHITENOISE_MANIFEST_STRICT = False
 
-# ── Email — Anymail / Resend HTTP API ─────────────────────────────────────────
+# ── Email — 2FA verification codes via Brevo (Sendinblue) ────────────────────
+# Uses django-anymail to route through Brevo's transactional API,
+# bypassing SMTP port restrictions common on cloud providers like Render.
 #
-# Why Anymail + Resend instead of SMTP:
-#   Render Free blocks outbound port 587 (SMTP), causing [Errno 101]
-#   Network is unreachable. Anymail sends via Resend's HTTPS API instead,
-#   which is never blocked. The existing send_mail() calls in views.py
-#   do NOT need to change — Django routes them through this backend.
+# Required Render environment variable:
+#   SENDINBLUE_API_KEY  — from Brevo dashboard → SMTP & API → API Keys → Create
 #
-# Setup:
-#   1. Create a free account at https://resend.com
-#   2. Add and verify your sender domain (or use onboarding@resend.dev for testing)
-#   3. Create an API key at https://resend.com/api-keys
-#   4. Add RESEND_API_KEY to your Render environment variables
-#   5. Set DEFAULT_FROM_EMAIL to a verified sender address
+# DEFAULT_FROM_EMAIL must exactly match a verified sender in your Brevo account.
+# Set it as a Render env var, e.g.: Mind Companion <noreply@yourdomain.com>
 
-EMAIL_BACKEND   = 'anymail.backends.resend.EmailBackend'
-DEFAULT_FROM_EMAIL = os.environ.get(
-    'DEFAULT_FROM_EMAIL', 'Mind Companion <onboarding@resend.dev>'
-)
+EMAIL_BACKEND = 'anymail.backends.sendinblue.EmailBackend'
 
 ANYMAIL = {
-    'RESEND_API_KEY': os.environ.get('RESEND_API_KEY', ''),
+    'SENDINBLUE_API_KEY': os.environ.get('SENDINBLUE_API_KEY', ''),
 }
 
-# ── Device Trust cookie (2FA bypass for trusted browsers) ────────────────────
-#
-# When a user passes 2FA, we set a signed cookie named TRUSTED_DEVICE_COOKIE.
-# On next login, if the cookie is present and valid, 2FA is skipped.
-# The cookie is signed with Django's SECRET_KEY via get_signed_cookie() /
-# set_signed_cookie(), so it cannot be forged by the user.
-
-TRUSTED_DEVICE_COOKIE     = 'mc_trusted_device'   # cookie name
-TRUSTED_DEVICE_COOKIE_AGE = 60 * 60 * 24 * 30     # 30 days in seconds
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@mindcompanion.app')
 
 # ── API keys ──────────────────────────────────────────────────────────────────
 YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
@@ -143,41 +150,60 @@ ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Logging ───────────────────────────────────────────────────────────────────
-# Forces full tracebacks to stdout (visible in Render's Logs tab)
-# even when DEBUG = False.
+#
+# When DEBUG=False Django normally swallows 500 tracebacks and just sends an
+# email to ADMINS (which we haven't configured). This config forces the full
+# Python traceback of every 500 error to print to stdout/stderr, which Render
+# captures and shows in the Logs tab — making production errors debuggable.
+#
+# How to read the logs on Render:
+#   Dashboard → your web service → Logs tab → filter by "ERROR" or "CRITICAL"
+
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,
+    'disable_existing_loggers': False,  # keep Django's default loggers active
+
     'formatters': {
         'verbose': {
+            # Each log line: timestamp  level  logger_name  message
             'format': '{asctime} {levelname} {name} {message}',
             'style':  '{',
         },
     },
+
     'handlers': {
+        # StreamHandler with no filename → writes to stdout → Render captures it
         'console': {
             'class':     'logging.StreamHandler',
             'formatter': 'verbose',
         },
     },
+
     'loggers': {
+        # Root logger: catches everything not handled by a more specific logger
         '': {
             'handlers': ['console'],
-            'level':    'WARNING',
+            'level':    'WARNING',   # WARNING and above go to Render logs
         },
+
+        # Django's own request logger emits the 500 traceback here
         'django.request': {
             'handlers':  ['console'],
-            'level':     'ERROR',
-            'propagate': False,
+            'level':     'ERROR',    # logs every 5xx with full traceback
+            'propagate': False,      # don't double-log via root logger
         },
+
+        # Catches unhandled exceptions in views, signals, management commands
         'django': {
             'handlers':  ['console'],
             'level':     'ERROR',
             'propagate': False,
         },
+
+        # Your app's own logger — use logger = logging.getLogger(__name__) in views
         'wellness': {
             'handlers':  ['console'],
-            'level':     'DEBUG',
+            'level':     'DEBUG',    # show DEBUG+ from your own code
             'propagate': False,
         },
     },
