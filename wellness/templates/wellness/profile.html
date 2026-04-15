@@ -119,15 +119,15 @@
       <p class="profile-email">{{ request.user.email }}</p>
       <div class="profile-stats">
         <div class="stat">
-          <p class="stat-num">{{ watch_history|length }}</p>
+          <p class="stat-num">{{ watch_history_count }}</p>
           <p class="stat-label">Videos Watched</p>
         </div>
         <div class="stat">
-          <p class="stat-num">{{ helpful_ratings|length }}</p>
+          <p class="stat-num">{{ helpful_count }}</p>
           <p class="stat-label">Helpful Ratings</p>
         </div>
         <div class="stat">
-          <p class="stat-num">{{ comment_history|length }}</p>
+          <p class="stat-num">{{ comment_count }}</p>
           <p class="stat-label">Comments</p>
         </div>
       </div>

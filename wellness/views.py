@@ -527,29 +527,36 @@ def user_profile(request):
     """
     user = request.user
 
-    watch_history = (
+    # Convert to list so the template can use |length freely.
+    # Sliced querysets (.values(...)[:50]) raise TypeError with Django's
+    # |length filter because sliced querysets don't support len().
+    watch_history = list(
         WatchHistory.objects
         .filter(user=user)
         .order_by('-watched_at')
         .values('video_id', 'video_title', 'watched_at')[:50]
     )
 
-    helpful_ratings = (
+    helpful_ratings = list(
         VideoRating.objects
         .filter(user=user, score__gte=4)
         .order_by('-updated_at')
     )
 
-    comment_history = (
+    comment_history = list(
         VideoComment.objects
         .filter(user=user)
         .order_by('-created_at')
     )
 
     return render(request, 'wellness/profile.html', {
-        'watch_history':   watch_history,
-        'helpful_ratings': helpful_ratings,
-        'comment_history': comment_history,
+        'watch_history':        watch_history,
+        'helpful_ratings':      helpful_ratings,
+        'comment_history':      comment_history,
+        # Pass counts explicitly — avoids any queryset evaluation issues
+        'watch_history_count':  len(watch_history),
+        'helpful_count':        len(helpful_ratings),
+        'comment_count':        len(comment_history),
     })
 
 

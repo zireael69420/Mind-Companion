@@ -241,6 +241,7 @@ CHANGES vs previous version:
   <div class="auth-bar">
     {% if user.is_authenticated %}
       <span class="auth-greeting">👋 {{ user.username }}</span>
+      <a href="{% url 'wellness:profile' %}" class="auth-link">My Profile</a>
       <a href="{% url 'wellness:logout' %}" class="auth-link">Log out</a>
     {% else %}
       <a href="{% url 'wellness:login' %}" class="auth-link">Log in</a>
@@ -688,7 +689,5 @@ btnConfigs.forEach(cfg => {
   });
 });
 </script>
-
-{% include "partials/tab_sync.html" %}
 </body>
 </html>
