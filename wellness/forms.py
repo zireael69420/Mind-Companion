@@ -2,8 +2,6 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Comment
-
 
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(
@@ -58,16 +56,16 @@ class VerifyCodeForm(forms.Form):
         max_length=6,
         min_length=6,
         widget=forms.TextInput(attrs={
-            'class':         'mc-input code-input',
-            'placeholder':   '000000',
-            'autocomplete':  'one-time-code',
-            'inputmode':     'numeric',
-            'pattern':       '[0-9]{6}',
-            'maxlength':     '6',
+            'class':        'mc-input code-input',
+            'placeholder':  '000000',
+            'autocomplete': 'one-time-code',
+            'inputmode':    'numeric',
+            'pattern':      '[0-9]{6}',
+            'maxlength':    '6',
         }),
         label='Verification code',
         error_messages={
-            'required':  'Please enter the 6-digit code.',
+            'required':   'Please enter the 6-digit code.',
             'min_length': 'The code must be exactly 6 digits.',
             'max_length': 'The code must be exactly 6 digits.',
         },
@@ -78,18 +76,3 @@ class VerifyCodeForm(forms.Form):
         if not code.isdigit():
             raise forms.ValidationError('The code must contain digits only.')
         return code
-
-
-class CommentForm(forms.ModelForm):
-    class Meta:
-        model  = Comment
-        fields = ('body',)
-        widgets = {
-            'body': forms.Textarea(attrs={
-                'class': 'mc-input mc-textarea',
-                'placeholder': 'Share your thoughts about this video…',
-                'rows': 3,
-                'maxlength': 500,
-            }),
-        }
-        labels = {'body': ''}
