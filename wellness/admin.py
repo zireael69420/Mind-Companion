@@ -1,59 +1,56 @@
 from django.contrib import admin
-from django.db import ProgrammingError, OperationalError
+from django.utils.html import format_html
 
-from .models import Comment, EmailVerification, VideoRating, WellnessRating
+from .models import VideoComment, VideoRating
 
 
-@admin.register(WellnessRating)
-class WellnessRatingAdmin(admin.ModelAdmin):
-    list_display    = ('emotion_selected', 'rating_score', 'session_key', 'timestamp')
-    list_filter     = ('emotion_selected', 'rating_score')
-    search_fields   = ('session_key',)
-    readonly_fields = ('timestamp',)
-    ordering        = ('-timestamp',)
-
+# ── VideoRating ───────────────────────────────────────────────────────────────
 
 @admin.register(VideoRating)
 class VideoRatingAdmin(admin.ModelAdmin):
-    list_display    = ('user', 'video_id', 'video_title', 'score', 'updated_at')
-    list_filter     = ('score',)
-    search_fields   = ('user__username', 'video_id', 'video_title')
+    list_display  = (
+        'video_id', 'video_title', 'star_display',
+        'user_display', 'created_at', 'updated_at',
+    )
+    list_filter   = ('score', 'video_id')
+    search_fields = ('video_id', 'video_title', 'user__username', 'user__email')
     readonly_fields = ('created_at', 'updated_at')
-    ordering        = ('-updated_at',)
+    ordering      = ('-updated_at',)
+    date_hierarchy = 'created_at'
+
+    # Show star emojis instead of a bare integer for instant readability
+    @admin.display(description='Score', ordering='score')
+    def star_display(self, obj):
+        return '★' * obj.score + '☆' * (5 - obj.score)
+
+    # Show username or "anonymous" gracefully
+    @admin.display(description='User', ordering='user__username')
+    def user_display(self, obj):
+        if obj.user:
+            return obj.user.username
+        return format_html('<span style="color:#aaa;">anonymous</span>')
 
 
-@admin.register(Comment)
-class CommentAdmin(admin.ModelAdmin):
-    list_display    = ('user', 'video_id', 'video_title', 'short_body', 'created_at')
-    list_filter     = ('created_at',)
-    search_fields   = ('user__username', 'video_id', 'video_title', 'body')
+# ── VideoComment ──────────────────────────────────────────────────────────────
+
+@admin.register(VideoComment)
+class VideoCommentAdmin(admin.ModelAdmin):
+    list_display  = (
+        'video_id', 'video_title', 'user_display',
+        'body_preview', 'created_at',
+    )
+    list_filter   = ('video_id',)
+    search_fields = ('video_id', 'video_title', 'body', 'user__username', 'user__email')
     readonly_fields = ('created_at',)
-    ordering        = ('-created_at',)
+    ordering      = ('-created_at',)
+    date_hierarchy = 'created_at'
+
+    @admin.display(description='User', ordering='user__username')
+    def user_display(self, obj):
+        if obj.user:
+            return obj.user.username
+        return format_html('<span style="color:#aaa;">anonymous</span>')
 
     @admin.display(description='Comment preview')
-    def short_body(self, obj):
-        return obj.body[:60] + ('…' if len(obj.body) > 60 else '')
-
-
-@admin.register(EmailVerification)
-class EmailVerificationAdmin(admin.ModelAdmin):
-    list_display    = ('user', 'code', 'created_at', 'is_used', 'status')
-    list_filter     = ('is_used',)
-    search_fields   = ('user__username', 'user__email')
-    readonly_fields = ('code', 'created_at', 'user')
-    ordering        = ('-created_at',)
-
-    def get_queryset(self, request):
-        """Return empty queryset gracefully if the table doesn't exist yet."""
-        try:
-            return super().get_queryset(request)
-        except (ProgrammingError, OperationalError):
-            return EmailVerification.objects.none()
-
-    @admin.display(description='Status')
-    def status(self, obj):
-        if obj.is_used:
-            return '✅ Used'
-        if obj.is_expired():
-            return '⏰ Expired'
-        return '🟢 Active'
+    def body_preview(self, obj):
+        return obj.body[:80] + ('…' if len(obj.body) > 80 else '')

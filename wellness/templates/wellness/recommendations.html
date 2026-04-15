@@ -1,8 +1,9 @@
 {% comment %}
 FILE: wellness/templates/wellness/recommendations.html
-Embed URL: https://www.youtube.com/embed/{id}?rel=0&modestbranding=1&enablejsapi=1&origin={window.location.origin}
-Thumbnail:  https://img.youtube.com/vi/{id}/mqdefault.jpg  (mqdefault exists for every video)
-All three URLs (embed, thumbnail, watch) derived from the same video_id.
+- Old emotion-level rating section removed entirely.
+- Per-video feedback panel (stars + comment) added inside the modal,
+  below the video info bar.
+- All AJAX calls use fetch() with CSRF token from the hidden input.
 {% endcomment %}
 <!DOCTYPE html>
 <html lang="en">
@@ -14,7 +15,7 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
   <style>
-    :root { --ink:#3D2C35; --muted:#9B8EA0; --cream:#FFF8F0; }
+    :root { --ink:#3D2C35; --muted:#9B8EA0; --cream:#FFF8F0; --purple:#8570CF; }
     *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'DM Sans',sans-serif; background:var(--cream); min-height:100vh; }
 
@@ -29,6 +30,7 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
 
     .page-wrap { position:relative; z-index:2; max-width:1060px; margin:0 auto; padding:1.25rem 1.25rem 5rem; }
 
+    /* ── Nav ── */
     .nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; }
     .back-link {
       font-size:0.82rem; color:var(--muted); text-decoration:none;
@@ -41,22 +43,12 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
       display:flex; align-items:center; gap:0.35rem;
     }
     .auth-bar { display:flex; align-items:center; gap:0.45rem; min-width:60px; justify-content:flex-end; }
-    .auth-greeting {
-      font-size:0.7rem; color:var(--muted); font-style:italic;
-      max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
-    .auth-link {
-      font-size:0.72rem; color:#8570CF; text-decoration:none; white-space:nowrap;
-      padding:0.28rem 0.7rem; border-radius:999px;
-      border:1.5px solid rgba(133,112,207,0.4); transition:background 0.18s;
-    }
+    .auth-greeting { font-size:0.7rem; color:var(--muted); font-style:italic; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .auth-link { font-size:0.72rem; color:#8570CF; text-decoration:none; white-space:nowrap; padding:0.28rem 0.7rem; border-radius:999px; border:1.5px solid rgba(133,112,207,0.4); transition:background 0.18s; }
     .auth-link:hover { background:rgba(133,112,207,0.1); }
-    .auth-link--cta {
-      background:linear-gradient(135deg,#8570CF,#C7A0EA);
-      color:white !important; border-color:transparent;
-    }
-    .auth-link--cta:hover { opacity:0.88; background:linear-gradient(135deg,#8570CF,#C7A0EA); }
+    .auth-link--cta { background:linear-gradient(135deg,#8570CF,#C7A0EA); color:white !important; border-color:transparent; }
 
+    /* ── Page header ── */
     .page-header { text-align:center; margin-bottom:1.5rem; }
     .emotion-badge {
       display:inline-flex; align-items:center; gap:8px;
@@ -65,173 +57,168 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
       font-family:'Baloo 2',sans-serif; font-size:0.95rem; font-weight:700; color:var(--ink);
       margin-bottom:0.65rem; box-shadow:0 4px 16px rgba(0,0,0,0.07);
     }
-    .page-title {
-      font-family:'Baloo 2',sans-serif;
-      font-size:clamp(1.4rem,3vw,2rem); font-weight:900; color:var(--ink); line-height:1.15;
-    }
+    .page-title { font-family:'Baloo 2',sans-serif; font-size:clamp(1.4rem,3vw,2rem); font-weight:900; color:var(--ink); line-height:1.15; }
     .page-sub { font-size:0.85rem; color:var(--muted); margin-top:0.35rem; font-style:italic; }
 
     /* ── 3×2 grid ── */
-    .video-grid {
-      display:grid;
-      grid-template-columns: repeat(3,1fr);
-      gap:1.1rem; margin-bottom:2.5rem;
-    }
+    .video-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.1rem; margin-bottom:2.5rem; }
     @media (max-width:768px) { .video-grid { grid-template-columns:repeat(2,1fr); } }
     @media (max-width:480px) { .video-grid { grid-template-columns:1fr; } }
 
     .video-card {
-      background:rgba(255,255,255,0.78);
-      border:1.5px solid rgba(255,255,255,0.95);
+      background:rgba(255,255,255,0.78); border:1.5px solid rgba(255,255,255,0.95);
       backdrop-filter:blur(10px); border-radius:18px; overflow:hidden;
       box-shadow:0 5px 20px rgba(0,0,0,0.07);
-      transition:transform 0.22s ease, box-shadow 0.22s ease;
-      cursor:pointer;
+      transition:transform 0.22s ease, box-shadow 0.22s ease; cursor:pointer;
     }
     .video-card:hover { transform:translateY(-4px); box-shadow:0 14px 34px rgba(0,0,0,0.11); }
 
-    /* Thumbnail */
-    .thumb-wrap {
-      position:relative; background:#ede8f5; overflow:hidden; aspect-ratio:16/9;
-    }
+    .thumb-wrap { position:relative; background:#ede8f5; overflow:hidden; aspect-ratio:16/9; }
     .thumb-wrap img { width:100%; height:100%; object-fit:cover; display:block; transition:transform 0.3s; }
     .video-card:hover .thumb-wrap img { transform:scale(1.04); }
-    .play-overlay {
-      position:absolute; inset:0;
-      display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,0.15); transition:background 0.2s;
-    }
+    .play-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.15); transition:background 0.2s; }
     .video-card:hover .play-overlay { background:rgba(0,0,0,0.28); }
-    .play-btn {
-      width:46px; height:46px; border-radius:50%;
-      background:rgba(255,255,255,0.93); display:flex; align-items:center; justify-content:center;
-      box-shadow:0 3px 14px rgba(0,0,0,0.18); transition:transform 0.2s;
-    }
+    .play-btn { width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.93); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 14px rgba(0,0,0,0.18); transition:transform 0.2s; }
     .video-card:hover .play-btn { transform:scale(1.12); }
-    .play-icon {
-      width:0; height:0; border-style:solid;
-      border-width:8px 0 8px 16px;
-      border-color:transparent transparent transparent #8570CF;
-      margin-left:3px;
-    }
+    .play-icon { width:0; height:0; border-style:solid; border-width:8px 0 8px 16px; border-color:transparent transparent transparent #8570CF; margin-left:3px; }
 
     .video-info { padding:0.8rem 0.9rem 0.85rem; }
-    .video-title {
-      font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.82rem;
-      color:var(--ink); line-height:1.35; margin-bottom:0.2rem;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-    }
+    .video-title { font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.82rem; color:var(--ink); line-height:1.35; margin-bottom:0.2rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     .video-channel { font-size:0.68rem; color:var(--muted); }
+
+    /* ── Social proof badge on video card ── */
+    .sp-badge {
+      display:inline-flex; align-items:center; gap:0.3rem;
+      margin-top:0.35rem; padding:0.2rem 0.55rem;
+      background:rgba(133,112,207,0.1); border-radius:999px;
+      font-size:0.68rem; color:#5a44a0; font-weight:600; line-height:1;
+    }
+    .sp-badge .sp-stars { color:#F59E0B; letter-spacing:-0.05em; }
+    .sp-badge .sp-none  { color:var(--muted); font-weight:400; font-style:italic; }
+
+    /* ── Social proof banner above player in modal ── */
+    #sp-banner {
+      background:linear-gradient(90deg,rgba(133,112,207,0.12),rgba(199,160,234,0.12));
+      border-bottom:1px solid rgba(133,112,207,0.18);
+      padding:0.55rem 1.1rem;
+      display:flex; align-items:center; gap:0.55rem;
+      min-height:2.4rem;
+    }
+    #sp-banner .sp-score {
+      font-family:'Baloo 2',sans-serif; font-weight:800;
+      font-size:0.92rem; color:#5a44a0;
+    }
+    #sp-banner .sp-stars-filled { color:#F59E0B; font-size:0.95rem; letter-spacing:-0.05em; }
+    #sp-banner .sp-detail { font-size:0.74rem; color:var(--muted); }
+    #sp-banner .sp-prompt { font-size:0.78rem; color:var(--muted); font-style:italic; }
 
     /* ── VIDEO MODAL ── */
     #video-modal {
       position:fixed; inset:0; z-index:1000;
-      display:flex; align-items:center; justify-content:center;
-      padding:1.25rem;
-      opacity:0; pointer-events:none;
-      transition:opacity 0.3s ease;
+      display:flex; align-items:center; justify-content:center; padding:1.25rem;
+      opacity:0; pointer-events:none; transition:opacity 0.3s ease;
     }
     #video-modal.open { opacity:1; pointer-events:all; }
-
-    #modal-backdrop {
-      position:absolute; inset:0;
-      background:rgba(30,15,40,0.75); backdrop-filter:blur(8px);
-    }
-
+    #modal-backdrop { position:absolute; inset:0; background:rgba(30,15,40,0.75); backdrop-filter:blur(8px); }
     #modal-box {
-      position:relative; z-index:2;
-      width:min(800px,96vw);
-      background:rgba(255,250,248,0.97);
-      border:1.5px solid rgba(255,255,255,0.9);
-      border-radius:24px; overflow:hidden;
+      position:relative; z-index:2; width:min(820px,96vw);
+      background:rgba(255,250,248,0.97); border:1.5px solid rgba(255,255,255,0.9);
+      border-radius:24px; overflow:hidden; overflow-y:auto; max-height:92vh;
       box-shadow:0 28px 80px rgba(0,0,0,0.24);
       transform:scale(0.88); transition:transform 0.32s cubic-bezier(.34,1.56,.64,1);
     }
     #video-modal.open #modal-box { transform:scale(1); }
 
-    /* 16:9 iframe container */
-    #modal-iframe-wrap {
-      position:relative; width:100%; padding-top:56.25%; background:#1a0a1f;
-    }
-    #youtube-player {
-      position:absolute; inset:0; width:100%; height:100%; border:none; display:block;
-    }
+    #modal-iframe-wrap { position:relative; width:100%; padding-top:56.25%; background:#1a0a1f; }
+    #youtube-player { position:absolute; inset:0; width:100%; height:100%; border:none; display:block; }
 
-    /* Fallback banner — shown when video can't embed */
     #embed-fallback {
-      position:absolute; inset:0;
-      display:none; flex-direction:column; align-items:center; justify-content:center;
-      gap:1rem; background:#1a0a1f; color:white; text-align:center; padding:2rem;
+      position:absolute; inset:0; display:none; flex-direction:column;
+      align-items:center; justify-content:center; gap:1rem;
+      background:#1a0a1f; color:white; text-align:center; padding:2rem;
     }
     #embed-fallback.show { display:flex; }
     .fallback-title { font-family:'Baloo 2',sans-serif; font-weight:700; font-size:1rem; }
     .fallback-sub   { font-size:0.8rem; opacity:0.7; }
-    .watch-yt-btn {
-      display:inline-flex; align-items:center; gap:0.5rem;
-      background:#FF0000; color:white; border-radius:999px;
-      padding:10px 22px; font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.88rem;
-      text-decoration:none; transition:opacity 0.2s;
-    }
+    .watch-yt-btn { display:inline-flex; align-items:center; gap:0.5rem; background:#FF0000; color:white; border-radius:999px; padding:10px 22px; font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.88rem; text-decoration:none; transition:opacity 0.2s; }
     .watch-yt-btn:hover { opacity:0.85; }
 
-    /* Modal info bar */
-    #modal-info {
-      padding:0.85rem 1.1rem 0.95rem;
-      display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;
-    }
+    #modal-info { padding:0.85rem 1.1rem 0.75rem; display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
     #modal-title   { font-family:'Baloo 2',sans-serif; font-weight:800; font-size:0.92rem; color:var(--ink); line-height:1.35; }
     #modal-channel { font-size:0.7rem; color:var(--muted); margin-top:0.18rem; }
-    #modal-watch-link {
-      display:inline-flex; align-items:center; gap:0.35rem;
-      font-size:0.7rem; color:#8570CF; text-decoration:none; margin-top:0.3rem;
-      transition:opacity 0.2s;
-    }
+    #modal-watch-link { display:inline-flex; align-items:center; gap:0.35rem; font-size:0.7rem; color:#8570CF; text-decoration:none; margin-top:0.3rem; transition:opacity 0.2s; }
     #modal-watch-link:hover { opacity:0.7; }
-
-    .modal-close-btn {
-      flex-shrink:0; width:34px; height:34px; border-radius:50%;
-      background:rgba(133,112,207,0.12); border:none; cursor:pointer;
-      display:flex; align-items:center; justify-content:center;
-      font-size:1rem; color:#8570CF; transition:background 0.2s, transform 0.2s;
-    }
+    .modal-close-btn { flex-shrink:0; width:34px; height:34px; border-radius:50%; background:rgba(133,112,207,0.12); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; color:#8570CF; transition:background 0.2s, transform 0.2s; }
     .modal-close-btn:hover { background:rgba(133,112,207,0.22); transform:scale(1.1); }
 
-    /* ── Rating section ── */
-    .rating-section {
-      background:rgba(255,255,255,0.82); border:1.5px solid rgba(255,255,255,0.95);
-      backdrop-filter:blur(12px); border-radius:24px; padding:1.8rem 1.5rem;
-      text-align:center; max-width:480px; margin:0 auto;
-      box-shadow:0 8px 30px rgba(0,0,0,0.07);
+    /* ── Feedback panel ── */
+    #feedback-panel {
+      border-top:1px solid rgba(133,112,207,0.15);
+      padding:1rem 1.1rem 1.3rem;
     }
-    .rating-title { font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.15rem; color:var(--ink); margin-bottom:0.25rem; }
-    .rating-sub   { font-size:0.8rem; color:var(--muted); margin-bottom:1.2rem; font-style:italic; }
-    .stars-row    { display:flex; justify-content:center; gap:8px; margin-bottom:1.1rem; }
-    .star-btn {
-      font-size:2rem; background:none; border:none; cursor:pointer;
-      color:#E0D0E0; line-height:1; transition:transform 0.15s, color 0.15s;
+    .feedback-heading {
+      font-family:'Baloo 2',sans-serif; font-weight:800; font-size:0.88rem;
+      color:var(--ink); margin-bottom:0.85rem;
+      display:flex; align-items:center; gap:0.4rem;
     }
-    .star-btn:hover { transform:scale(1.22); }
-    .star-btn.lit    { color:#FBBF24; }
-    .star-btn.active { color:#F59E0B; }
-    .star-label  { font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.88rem; color:#8570CF; min-height:1.3em; margin-bottom:0.9rem; }
-    .submit-btn {
-      font-family:'Baloo 2',sans-serif; font-weight:800; font-size:0.92rem; color:white;
-      background:linear-gradient(135deg,#8570CF,#C7A0EA); border:none; border-radius:999px;
-      padding:11px 28px; cursor:pointer;
-      box-shadow:0 5px 18px rgba(133,112,207,0.32);
-      opacity:0.38; pointer-events:none;
-      transition:transform 0.2s, box-shadow 0.2s, opacity 0.2s;
-    }
-    .submit-btn.ready { opacity:1; pointer-events:all; }
-    .submit-btn.ready:hover { transform:translateY(-2px); box-shadow:0 9px 24px rgba(133,112,207,0.42); }
-    .skip-link { display:block; margin-top:0.9rem; font-size:0.72rem; color:var(--muted); text-decoration:none; }
-    .skip-link:hover { color:var(--ink); text-decoration:underline; }
 
+    /* Star rating row */
+    .fb-stars-row { display:flex; gap:0.3rem; margin-bottom:0.3rem; }
+    .fb-star {
+      font-size:1.6rem; background:none; border:none; cursor:pointer;
+      color:#DDD0E8; line-height:1; padding:0;
+      transition:color 0.12s, transform 0.12s;
+    }
+    .fb-star:hover, .fb-star.hovered { color:#FBBF24; transform:scale(1.15); }
+    .fb-star.selected { color:#F59E0B; }
+    .fb-star-label { font-size:0.72rem; color:var(--purple); font-weight:600; min-height:1em; margin-bottom:0.75rem; }
+
+    /* Average rating display */
+    .avg-display { font-size:0.72rem; color:var(--muted); margin-bottom:0.9rem; }
+    .avg-display strong { color:var(--ink); }
+
+    /* Comment area */
+    .fb-comment-label { font-size:0.78rem; font-weight:500; color:var(--ink); margin-bottom:0.35rem; display:block; }
+    .fb-textarea {
+      width:100%; padding:0.6rem 0.8rem; border:1.5px solid #E8DFF0; border-radius:12px;
+      font-family:'DM Sans',sans-serif; font-size:0.82rem; color:var(--ink);
+      background:rgba(255,255,255,0.9); outline:none; resize:vertical; min-height:72px;
+      transition:border-color 0.2s, box-shadow 0.2s;
+    }
+    .fb-textarea:focus { border-color:var(--purple); box-shadow:0 0 0 3px rgba(133,112,207,0.12); }
+    .fb-char-count { font-size:0.68rem; color:var(--muted); text-align:right; margin-top:0.2rem; margin-bottom:0.6rem; }
+    .fb-char-count.warn { color:#E05C6A; }
+
+    .fb-submit-btn {
+      padding:0.5rem 1.2rem;
+      background:linear-gradient(135deg,#8570CF,#C7A0EA); color:white;
+      font-family:'Baloo 2',sans-serif; font-weight:700; font-size:0.82rem;
+      border:none; border-radius:999px; cursor:pointer;
+      box-shadow:0 4px 14px rgba(133,112,207,0.3);
+      transition:transform 0.18s, opacity 0.18s;
+    }
+    .fb-submit-btn:hover { transform:translateY(-1px); }
+    .fb-submit-btn:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+    .fb-status { font-size:0.72rem; color:var(--purple); margin-left:0.6rem; vertical-align:middle; }
+
+    .fb-anon-note { font-size:0.74rem; color:var(--muted); font-style:italic; margin-bottom:0.75rem; }
+    .fb-anon-note a { color:var(--purple); }
+
+    /* Comment list */
+    .fb-comments-heading { font-size:0.78rem; font-weight:600; color:var(--muted); margin:1rem 0 0.5rem; text-transform:uppercase; letter-spacing:0.05em; }
+    .fb-comment-list { max-height:160px; overflow-y:auto; }
+    .fb-comment-entry { padding:0.4rem 0; border-bottom:1px solid rgba(133,112,207,0.1); }
+    .fb-comment-entry:last-child { border-bottom:none; }
+    .fb-comment-meta { font-size:0.68rem; color:var(--muted); margin-bottom:0.1rem; }
+    .fb-comment-meta strong { color:var(--purple); }
+    .fb-comment-body { font-size:0.78rem; color:var(--ink); line-height:1.45; }
+    .fb-empty { font-size:0.75rem; color:var(--muted); font-style:italic; }
+
+    /* ── Toast ── */
     #toast {
       position:fixed; bottom:1.5rem; right:1.5rem; z-index:2000;
       background:white; border-radius:14px; padding:0.7rem 1.1rem;
-      box-shadow:0 8px 28px rgba(0,0,0,0.12);
-      display:flex; align-items:center; gap:0.55rem;
+      box-shadow:0 8px 28px rgba(0,0,0,0.12); display:flex; align-items:center; gap:0.55rem;
       font-size:0.8rem; color:var(--ink);
       opacity:0; transform:translateY(10px);
       transition:opacity 0.3s, transform 0.3s; pointer-events:none;
@@ -244,44 +231,84 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
 <div class="bg-mesh"></div>
 <div id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
 
-<!-- ══ VIDEO MODAL ════════════════════════════════════════════════════════ -->
+<!-- ══ VIDEO MODAL ═══════════════════════════════════════════════════════════ -->
 <div id="video-modal" role="dialog" aria-modal="true" aria-label="Video player">
-  <div id="modal-backdrop" onclick="closeModal()"></div>
+  <div id="modal-backdrop"></div>
   <div id="modal-box">
 
-    <div id="modal-iframe-wrap">
-      <!-- src is always set programmatically — never hardcoded here -->
-      <iframe
-        id="youtube-player"
-        src=""
-        allowfullscreen
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerpolicy="origin">
-      </iframe>
+    <!-- Social proof banner — shows aggregate score above the player -->
+    <div id="sp-banner">
+      <span class="sp-prompt">Loading ratings…</span>
+    </div>
 
-      <!-- Fallback: shown when a video disallows embedding -->
+    <!-- Player -->
+    <div id="modal-iframe-wrap">
+      <iframe id="youtube-player" src="" allowfullscreen
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="origin"></iframe>
       <div id="embed-fallback">
         <p class="fallback-title">This video can't be embedded here.</p>
         <p class="fallback-sub">You can still watch it directly on YouTube.</p>
-        <a id="fallback-yt-link" href="#" target="_blank" rel="noopener" class="watch-yt-btn">
-          ▶ Watch on YouTube
-        </a>
+        <a id="fallback-yt-link" href="#" target="_blank" rel="noopener" class="watch-yt-btn">▶ Watch on YouTube</a>
       </div>
     </div>
 
+    <!-- Info bar -->
     <div id="modal-info">
       <div>
         <p id="modal-title">—</p>
         <p id="modal-channel">—</p>
-        <a id="modal-watch-link" href="#" target="_blank" rel="noopener">
-          ↗ Watch on YouTube
-        </a>
+        <a id="modal-watch-link" href="#" target="_blank" rel="noopener">↗ Watch on YouTube</a>
       </div>
-      <button class="modal-close-btn" onclick="closeModal()" aria-label="Close video">✕</button>
+      <button class="modal-close-btn" id="modal-close-btn" aria-label="Close video">✕</button>
     </div>
+
+    <!-- ── Video Feedback Panel ─────────────────────────────────────────── -->
+    <div id="feedback-panel">
+      <p class="feedback-heading">💬 How helpful was this video to you?</p>
+
+      <!-- Star rating -->
+      <div class="fb-stars-row" id="fb-stars" aria-label="Rate this video">
+        <button class="fb-star" data-val="1" aria-label="1 star">★</button>
+        <button class="fb-star" data-val="2" aria-label="2 stars">★</button>
+        <button class="fb-star" data-val="3" aria-label="3 stars">★</button>
+        <button class="fb-star" data-val="4" aria-label="4 stars">★</button>
+        <button class="fb-star" data-val="5" aria-label="5 stars">★</button>
+      </div>
+      <p class="fb-star-label" id="fb-star-label"></p>
+      <p class="avg-display" id="fb-avg-display"></p>
+
+      <!-- Comment -->
+      <label class="fb-comment-label" for="fb-comment-input">Leave a comment (optional)</label>
+      {% if user.is_authenticated %}
+        <textarea id="fb-comment-input" class="fb-textarea" maxlength="500"
+          placeholder="Share your thoughts about this video…"></textarea>
+        <p class="fb-char-count" id="fb-char-count">0 / 500</p>
+        <button class="fb-submit-btn" id="fb-submit-btn" disabled>Submit Feedback</button>
+        <span class="fb-status" id="fb-status"></span>
+      {% else %}
+        <textarea id="fb-comment-input" class="fb-textarea" maxlength="500"
+          placeholder="Share your thoughts about this video…"></textarea>
+        <p class="fb-char-count" id="fb-char-count">0 / 500</p>
+        <p class="fb-anon-note">
+          You're submitting as a guest.
+          <a href="{% url 'wellness:login' %}?next={{ request.path }}">Log in</a> to track your feedback.
+        </p>
+        <button class="fb-submit-btn" id="fb-submit-btn" disabled>Submit Feedback</button>
+        <span class="fb-status" id="fb-status"></span>
+      {% endif %}
+
+      <!-- Existing comments -->
+      <p class="fb-comments-heading">What others said</p>
+      <div class="fb-comment-list" id="fb-comment-list">
+        <p class="fb-empty">No feedback yet — be the first!</p>
+      </div>
+    </div>
+    <!-- ── End Feedback Panel ─────────────────────────────────────────────── -->
+
   </div>
 </div>
-<!-- ═════════════════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
 <div class="page-wrap">
 
@@ -293,7 +320,7 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
         <span class="auth-greeting">👋 {{ user.username }}</span>
         <a href="{% url 'wellness:logout' %}" class="auth-link">Log out</a>
       {% else %}
-        <a href="{% url 'wellness:login' %}" class="auth-link">Log in</a>
+        <a href="{% url 'wellness:login' %}?next={{ request.path }}" class="auth-link">Log in</a>
         <a href="{% url 'wellness:register' %}" class="auth-link auth-link--cta">Register</a>
       {% endif %}
     </div>
@@ -302,10 +329,10 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
   <header class="page-header" id="page-header">
     <div class="emotion-badge"><span>{{ meta.emoji }}</span><span>Feeling {{ meta.label }}</span></div>
     <h1 class="page-title">Here's something to help&nbsp;💙</h1>
-    <p class="page-sub">Click any video to watch it right here — no redirects.</p>
+    <p class="page-sub">Click any video to watch — then tell us how helpful it was.</p>
   </header>
 
-  <!-- ── 3×2 Video Grid ── -->
+  <!-- 3×2 Video Grid -->
   <div class="video-grid" id="video-grid">
     {% for video in videos %}
     <div class="video-card"
@@ -313,25 +340,28 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
          data-title="{{ video.title }}"
          data-channel="{{ video.channel }}"
          data-watch-url="{{ video.watch_url }}"
+         data-avg-score="{{ video.avg_score|default:'' }}"
+         data-rating-count="{{ video.rating_count|default:0 }}"
          id="vcard-{{ forloop.counter }}"
          role="button" tabindex="0"
-         aria-label="Play: {{ video.title }}">
-
+         aria-label="Play: {{ video.title }}"{% if video.avg_score %} aria-description="Rated {{ video.avg_score }}/5 by {{ video.rating_count }} user{{ video.rating_count|pluralize }}"{% endif %}>
       <div class="thumb-wrap">
-        <img
-          src="{{ video.thumbnail }}"
-          alt="{{ video.title }}"
-          loading="{% if forloop.counter <= 3 %}eager{% else %}lazy{% endif %}"
-          onerror="this.src='https://img.youtube.com/vi/{{ video.video_id }}/mqdefault.jpg'"
-        />
-        <div class="play-overlay">
-          <div class="play-btn"><div class="play-icon"></div></div>
-        </div>
+        <img src="{{ video.thumbnail }}" alt="{{ video.title }}"
+             loading="{% if forloop.counter <= 3 %}eager{% else %}lazy{% endif %}"
+             onerror="this.src='https://img.youtube.com/vi/{{ video.video_id }}/mqdefault.jpg'"/>
+        <div class="play-overlay"><div class="play-btn"><div class="play-icon"></div></div></div>
       </div>
-
       <div class="video-info">
         <p class="video-title">{{ video.title }}</p>
         <p class="video-channel">{{ video.channel }}</p>
+        {% if video.avg_score and video.rating_count %}
+          <span class="sp-badge">
+            <span class="sp-stars">{{ video.avg_score|floatformat:1 }}★</span>
+            <span>({{ video.rating_count }} review{{ video.rating_count|pluralize }})</span>
+          </span>
+        {% else %}
+          <span class="sp-badge"><span class="sp-none">No ratings yet</span></span>
+        {% endif %}
       </div>
     </div>
     {% empty %}
@@ -342,87 +372,88 @@ All three URLs (embed, thumbnail, watch) derived from the same video_id.
     {% endfor %}
   </div>
 
-  <!-- ── Rating ── -->
-  <div class="rating-section" id="rating-section">
-    <h2 class="rating-title">🌸 How helpful was this?</h2>
-    <p class="rating-sub">Your feedback helps Mind Companion improve for everyone.</p>
-    <div class="stars-row" id="stars-row">
-      {% for i in "12345" %}
-      <button class="star-btn" data-val="{{ forloop.counter }}"
-              onclick="selectStar({{ forloop.counter }})"
-              aria-label="{{ forloop.counter }} star">★</button>
-      {% endfor %}
-    </div>
-    <p class="star-label" id="star-label">&nbsp;</p>
-    <button class="submit-btn" id="submit-btn" onclick="submitRating()">Submit Rating ✨</button>
-    <a href="{% url 'wellness:landing' %}" class="skip-link">Skip — return home</a>
+  <div style="text-align:center; padding:1rem 0 2rem;">
+    <a href="{% url 'wellness:landing' %}"
+       style="font-size:0.8rem; color:var(--muted); text-decoration:none;">
+      ← Choose a different emotion
+    </a>
   </div>
 
 </div><!-- /page-wrap -->
 
+{# CSRF token available to JS without a form element #}
+{% csrf_token %}
+
 <script>
-const EMOTION   = '{{ emotion }}';
-const VIDEO_IDS = '{{ video_ids }}';
-const CSRF      = '{{ csrf_token }}';
+// ── Constants ─────────────────────────────────────────────────────────────────
+const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
 // ── GSAP intro ────────────────────────────────────────────────────────────────
-gsap.set(['#page-header', '.video-card', '#rating-section'], { autoAlpha:0, y:18 });
-const tl = gsap.timeline({ defaults:{ ease:'power3.out' } });
-tl.to('#page-header',    { autoAlpha:1, y:0, duration:0.5 })
-  .to('.video-card',     { autoAlpha:1, y:0, duration:0.38, stagger:0.07 }, '-=0.2')
-  .to('#rating-section', { autoAlpha:1, y:0, duration:0.45 }, '-=0.05');
+gsap.set(['#page-header', '.video-card'], { autoAlpha:0, y:18 });
+gsap.timeline({ defaults:{ ease:'power3.out' } })
+  .to('#page-header', { autoAlpha:1, y:0, duration:0.5 })
+  .to('.video-card',  { autoAlpha:1, y:0, duration:0.38, stagger:0.07 }, '-=0.2');
 
-// ════════════════════════════════════════════════════════════════════
-// VIDEO MODAL
-// ════════════════════════════════════════════════════════════════════
-
+// ── Modal state ───────────────────────────────────────────────────────────────
 const modal        = document.getElementById('video-modal');
-const iframe       = document.getElementById('youtube-player');   // id="youtube-player"
+const iframe       = document.getElementById('youtube-player');
 const fallbackDiv  = document.getElementById('embed-fallback');
 const fallbackLink = document.getElementById('fallback-yt-link');
 const mTitle       = document.getElementById('modal-title');
 const mChannel     = document.getElementById('modal-channel');
 const mWatchLink   = document.getElementById('modal-watch-link');
+const spBanner     = document.getElementById('sp-banner');   // social proof banner
+const YT_ID_RE     = /^[a-zA-Z0-9_-]{11}$/;
 
-// Regex matching exactly 11 valid YouTube ID characters
-const YT_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
+let currentVideoId    = '';
+let currentVideoTitle = '';
 
-// Decodes HTML entities in a string (e.g. &amp; → &, &amp;amp; → &amp;)
-// dataset properties return the raw attribute string — entities are NOT
-// automatically decoded by the browser when read via JavaScript.
 function decodeHtml(str) {
-  const txt = document.createElement('textarea');
-  txt.innerHTML = str;
-  return txt.value;
+  const t = document.createElement('textarea');
+  t.innerHTML = str;
+  return t.value;
 }
 
-function openModal(videoId, title, channel, watchUrl) {
-  // ── 1. Sanitise the ID in the browser as a second line of defence ──
+// ── Open / close modal ────────────────────────────────────────────────────────
+function openModal(videoId, title, channel, watchUrl, avgScore, ratingCount) {
   const cleanId = String(videoId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 11);
-
   if (!YT_ID_RE.test(cleanId)) {
-    console.error('[Mind Companion] Rejected malformed video ID:', videoId);
+    console.error('[MC] Rejected malformed video ID:', videoId);
     return;
   }
 
-  // ── 2. Reset any previous state ──────────────────────────────────
-  iframe.src = '';                          // clear first — forces a clean load
-  fallbackDiv.classList.remove('show');
+  currentVideoId    = cleanId;
+  currentVideoTitle = decodeHtml(title);
 
-  // ── 3. Build embed URL with enablejsapi + origin so YouTube can verify the domain ──
-  // enablejsapi=1 enables the JS Player API; origin tells YouTube which domain is embedding
+  // Reset player
+  iframe.src = '';
+  fallbackDiv.classList.remove('show');
   const embedUrl = `https://www.youtube.com/embed/${cleanId}?rel=0&modestbranding=1&enablejsapi=1&origin=${window.location.origin}`;
-  console.log('[Mind Companion] Embedding video:', embedUrl);
   iframe.src = embedUrl;
 
-  // ── 4. Update info bar — all three point to the SAME cleanId ─────
-  mTitle.textContent   = decodeHtml(title);
+  // Update info bar
+  mTitle.textContent   = currentVideoTitle;
   mChannel.textContent = decodeHtml(channel);
-  const ytWatchUrl     = `https://www.youtube.com/watch?v=${cleanId}`;
-  mWatchLink.href      = ytWatchUrl;
-  fallbackLink.href    = ytWatchUrl;
+  const watchHref = `https://www.youtube.com/watch?v=${cleanId}`;
+  mWatchLink.href  = watchHref;
+  fallbackLink.href = watchHref;
 
-  // ── 5. Open modal ─────────────────────────────────────────────────
+  // Pre-populate banner immediately from server-rendered card data (no flicker)
+  const avg   = avgScore   ? parseFloat(avgScore)   : null;
+  const count = ratingCount ? parseInt(ratingCount, 10) : 0;
+  renderAverage(avg, count);
+
+  // Reset rest of feedback panel, then fetch full data (comments + user score)
+  selectedScore = 0;
+  fbStars.forEach(s => s.classList.remove('selected', 'hovered'));
+  fbStarLabel.textContent = '';
+  if (fbInput) fbInput.value = '';
+  if (fbCharCount) { fbCharCount.textContent = '0 / 500'; fbCharCount.classList.remove('warn'); }
+  if (fbSubmitBtn) fbSubmitBtn.disabled = true;
+  fbStatus.textContent = '';
+  fbCommentList.innerHTML = '<p class="fb-empty">Loading…</p>';
+  loadVideoFeedback(cleanId);
+
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -430,89 +461,255 @@ function openModal(videoId, title, channel, watchUrl) {
 function closeModal() {
   modal.classList.remove('open');
   document.body.style.overflow = '';
-  // Wait for the CSS transition to finish, THEN clear the src
-  // so the video stops playing and doesn't accumulate params on re-open
   setTimeout(() => {
     iframe.src = '';
     fallbackDiv.classList.remove('show');
   }, 320);
 }
 
-// ── Event delegation: clicks on .video-card read data attributes ──────────────
-// This avoids any risk of JS string interpolation corrupting the ID.
-document.getElementById('video-grid').addEventListener('click', function(e) {
+// ── Card click / keyboard delegation ─────────────────────────────────────────
+document.getElementById('video-grid').addEventListener('click', e => {
   const card = e.target.closest('.video-card');
-  if (!card) return;
-  openModal(
-    card.dataset.videoId,
-    card.dataset.title,
-    card.dataset.channel,
-    card.dataset.watchUrl,
+  if (card) openModal(
+    card.dataset.videoId, card.dataset.title,
+    card.dataset.channel, card.dataset.watchUrl,
+    card.dataset.avgScore, card.dataset.ratingCount,
   );
 });
-
-// Keyboard accessibility for cards
-document.getElementById('video-grid').addEventListener('keydown', function(e) {
+document.getElementById('video-grid').addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const card = e.target.closest('.video-card');
   if (!card) return;
   e.preventDefault();
   openModal(
-    card.dataset.videoId,
-    card.dataset.title,
-    card.dataset.channel,
-    card.dataset.watchUrl,
+    card.dataset.videoId, card.dataset.title,
+    card.dataset.channel, card.dataset.watchUrl,
+    card.dataset.avgScore, card.dataset.ratingCount,
   );
 });
-
-// Backdrop click and Escape key close the modal
 document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-// ── Star rating ───────────────────────────────────────────────────────────────
-let selectedRating = 0;
-const LABELS = ['','Not helpful','Slightly helpful','Helpful','Very helpful','Amazing! 🌟'];
+// ══════════════════════════════════════════════════════════════════════════════
+// FEEDBACK PANEL
+// ══════════════════════════════════════════════════════════════════════════════
 
-function selectStar(val) {
-  selectedRating = val;
-  document.querySelectorAll('.star-btn').forEach((s, i) => {
-    const active = i < val;
-    s.classList.toggle('lit',    active);
-    s.classList.toggle('active', i === val-1);
-    if (active) gsap.fromTo(s, { scale:1.3 }, { scale:1, duration:0.35, ease:'elastic.out(1,0.5)' });
-  });
-  document.getElementById('star-label').textContent = LABELS[val] || '';
-  const btn = document.getElementById('submit-btn');
-  btn.classList.add('ready');
-  gsap.fromTo(btn, { scale:0.94 }, { scale:1, duration:0.3, ease:'back.out(2)' });
+const STAR_LABELS = ['', 'Not helpful', 'Slightly helpful', 'Helpful', 'Very helpful', 'Extremely helpful! 🌟'];
+let selectedScore = 0;
+
+const fbStars       = document.querySelectorAll('.fb-star');
+const fbStarLabel   = document.getElementById('fb-star-label');
+const fbAvgDisplay  = document.getElementById('fb-avg-display');
+const fbInput       = document.getElementById('fb-comment-input');
+const fbCharCount   = document.getElementById('fb-char-count');
+const fbSubmitBtn   = document.getElementById('fb-submit-btn');
+const fbStatus      = document.getElementById('fb-status');
+const fbCommentList = document.getElementById('fb-comment-list');
+
+function resetFeedbackPanel() {
+  selectedScore = 0;
+  fbStars.forEach(s => { s.classList.remove('selected', 'hovered'); });
+  fbStarLabel.textContent  = '';
+  fbAvgDisplay.textContent = '';
+  spBanner.innerHTML = '<span class="sp-prompt">Loading ratings…</span>';
+  if (fbInput) { fbInput.value = ''; }
+  if (fbCharCount) { fbCharCount.textContent = '0 / 500'; fbCharCount.classList.remove('warn'); }
+  if (fbSubmitBtn) { fbSubmitBtn.disabled = true; }
+  fbStatus.textContent = '';
+  fbCommentList.innerHTML = '<p class="fb-empty">Loading…</p>';
 }
 
-// ── Submit rating ─────────────────────────────────────────────────────────────
-async function submitRating() {
-  if (!selectedRating) return;
-  const btn = document.getElementById('submit-btn');
-  btn.textContent = 'Saving…';
-  btn.classList.remove('ready');
+// Star hover + click
+fbStars.forEach(star => {
+  const val = parseInt(star.dataset.val, 10);
+
+  star.addEventListener('mouseenter', () => {
+    fbStars.forEach((s, i) => s.classList.toggle('hovered', i < val));
+  });
+  star.addEventListener('mouseleave', () => {
+    fbStars.forEach(s => s.classList.remove('hovered'));
+  });
+  star.addEventListener('click', () => {
+    selectedScore = val;
+    fbStars.forEach((s, i) => {
+      s.classList.toggle('selected', i < val);
+      s.classList.remove('hovered');
+    });
+    fbStarLabel.textContent = STAR_LABELS[val] || '';
+    // Enable submit when at least a score is chosen
+    if (fbSubmitBtn) fbSubmitBtn.disabled = false;
+    // Auto-submit rating immediately
+    submitRating(val);
+  });
+});
+
+// Character counter
+if (fbInput) {
+  fbInput.addEventListener('input', () => {
+    const len = fbInput.value.length;
+    fbCharCount.textContent = `${len} / 500`;
+    fbCharCount.classList.toggle('warn', len > 450);
+    if (fbSubmitBtn) fbSubmitBtn.disabled = (selectedScore === 0 && len === 0);
+  });
+}
+
+// Submit rating (fires immediately on star click)
+async function submitRating(score) {
   try {
-    const resp = await fetch("{% url 'wellness:submit_rating' %}", {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'X-CSRFToken':CSRF },
-      body: JSON.stringify({ emotion:EMOTION, rating:selectedRating, video_ids:VIDEO_IDS }),
+    const resp = await fetch("{% url 'wellness:video_rate' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({
+        video_id:    currentVideoId,
+        video_title: currentVideoTitle,
+        score:       score,
+      }),
     });
     const data = await resp.json();
-    if (data.success && data.redirect_url) {
-      showToast('Rating saved! Thank you 💙','⭐');
-      setTimeout(() => { window.location.href = data.redirect_url; }, 900);
-    } else {
-      showToast('Something went wrong.','❌');
-      btn.textContent='Submit Rating ✨'; btn.classList.add('ready');
+    if (data.success) {
+      fbStatus.textContent = data.message;
+      setTimeout(() => { fbStatus.textContent = ''; }, 2500);
+      // Refresh average
+      refreshAverage();
     }
-  } catch {
-    showToast('Network error.','❌');
-    btn.textContent='Submit Rating ✨'; btn.classList.add('ready');
+  } catch (err) {
+    console.error('[MC] Rating error:', err);
   }
 }
 
+// Submit button — sends comment (score already saved on click)
+if (fbSubmitBtn) {
+  fbSubmitBtn.addEventListener('click', async () => {
+    const body = fbInput ? fbInput.value.trim() : '';
+    if (!body) {
+      fbStatus.textContent = 'Please write a comment before submitting.';
+      return;
+    }
+    fbSubmitBtn.disabled = true;
+    fbStatus.textContent = 'Saving…';
+    try {
+      const resp = await fetch("{% url 'wellness:video_comment' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({
+          video_id:    currentVideoId,
+          video_title: currentVideoTitle,
+          body:        body,
+        }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        fbStatus.textContent = 'Feedback saved! 💙';
+        if (fbInput) fbInput.value = '';
+        if (fbCharCount) { fbCharCount.textContent = '0 / 500'; fbCharCount.classList.remove('warn'); }
+        // Prepend new comment to the list
+        prependComment(data.username, data.body, data.time);
+        setTimeout(() => { fbStatus.textContent = ''; }, 3000);
+      } else {
+        fbStatus.textContent = data.error || 'Something went wrong.';
+        fbSubmitBtn.disabled = false;
+      }
+    } catch (err) {
+      fbStatus.textContent = 'Network error.';
+      fbSubmitBtn.disabled = false;
+    }
+  });
+}
+
+// Load existing feedback when modal opens
+async function loadVideoFeedback(videoId) {
+  try {
+    const resp = await fetch("{% url 'wellness:video_feedback' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ video_id: videoId }),
+    });
+    const data = await resp.json();
+
+    // Restore user's previous rating if any
+    if (data.user_score) {
+      selectedScore = data.user_score;
+      fbStars.forEach((s, i) => s.classList.toggle('selected', i < data.user_score));
+      fbStarLabel.textContent = STAR_LABELS[data.user_score] || '';
+      if (fbSubmitBtn) fbSubmitBtn.disabled = false;
+    }
+
+    // Show average
+    renderAverage(data.avg_score, data.rating_count);
+
+    // Render comments
+    renderComments(data.comments);
+  } catch (err) {
+    console.error('[MC] Feedback load error:', err);
+    fbCommentList.innerHTML = '<p class="fb-empty">Could not load feedback.</p>';
+  }
+}
+
+async function refreshAverage() {
+  try {
+    const resp = await fetch("{% url 'wellness:video_feedback' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ video_id: currentVideoId }),
+    });
+    const data = await resp.json();
+    renderAverage(data.avg_score, data.rating_count);
+  } catch (_) {}
+}
+
+function renderAverage(avg, count) {
+  // ── 1. Above-player social proof banner ───────────────────────────────────
+  if (!avg || !count) {
+    spBanner.innerHTML =
+      '<span class="sp-prompt">⭐ Be the first to rate how helpful this video is!</span>';
+  } else {
+    const filledStars = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
+    spBanner.innerHTML =
+      `<span class="sp-stars-filled">${filledStars}</span>` +
+      `<span class="sp-score">${avg}/5</span>` +
+      `<span class="sp-detail">(Based on ${count} user rating${count !== 1 ? 's' : ''} for helpfulness)</span>`;
+  }
+
+  // ── 2. Inside-panel average (compact) ────────────────────────────────────
+  if (!avg || !count) {
+    fbAvgDisplay.textContent = '';
+  } else {
+    fbAvgDisplay.textContent = `Community average: ${avg}/5 from ${count} rating${count !== 1 ? 's' : ''}`;
+  }
+}
+
+function renderComments(comments) {
+  if (!comments || comments.length === 0) {
+    fbCommentList.innerHTML = '<p class="fb-empty">No feedback yet — be the first!</p>';
+    return;
+  }
+  fbCommentList.innerHTML = comments.map(c => `
+    <div class="fb-comment-entry">
+      <p class="fb-comment-meta"><strong>${escHtml(c.username)}</strong> · ${escHtml(c.created_at)}</p>
+      <p class="fb-comment-body">${escHtml(c.body)}</p>
+    </div>`).join('');
+}
+
+function prependComment(username, body, time) {
+  // Remove "no feedback yet" placeholder if present
+  const placeholder = fbCommentList.querySelector('.fb-empty');
+  if (placeholder) placeholder.remove();
+  const el = document.createElement('div');
+  el.className = 'fb-comment-entry';
+  el.innerHTML = `
+    <p class="fb-comment-meta"><strong>${escHtml(username)}</strong> · ${escHtml(time)}</p>
+    <p class="fb-comment-body">${escHtml(body)}</p>`;
+  fbCommentList.prepend(el);
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function showToast(msg, icon) {
   const t = document.getElementById('toast');
   document.getElementById('toast-icon').textContent = icon;
@@ -521,7 +718,5 @@ function showToast(msg, icon) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 </script>
-
-{% include "partials/tab_sync.html" %}
 </body>
 </html>
