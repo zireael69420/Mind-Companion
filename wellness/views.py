@@ -252,21 +252,48 @@ def login_view(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
+
+            # Skip 2FA entirely if the user has no email address on file
             if not user.email:
                 login(request, user)
                 return _safe_redirect(request)
+
+            # ── Device Trust check ────────────────────────────────────────
+            # If this browser was trusted after a previous successful 2FA,
+            # a signed cookie is present. Verify it with Django's signing —
+            # an invalid or tampered cookie raises BadSignature.
+            cookie_name = getattr(settings, 'TRUSTED_DEVICE_COOKIE', 'mc_trusted_device')
+            try:
+                trusted_value = request.get_signed_cookie(cookie_name, salt='device-trust')
+                # Cookie must contain this user's pk to prevent cross-user reuse
+                if trusted_value == str(user.pk):
+                    login(request, user)
+                    return _safe_redirect(request)
+            except Exception:
+                # Missing cookie, bad signature, or wrong user — fall through to 2FA
+                pass
+
+            # ── Standard 2FA flow ─────────────────────────────────────────
+            # FAIL CLOSED: if sending the code fails for any reason, do NOT
+            # log the user in. Return a clean error so they can try again.
             try:
                 code = _issue_code(user)
                 _send_verification_email(user, code)
-                request.session['2fa_user_id'] = user.pk
-                request.session['2fa_next']    = request.GET.get('next', '')
-                return redirect('wellness:verify_email')
             except Exception as e:
-                logger.error('2FA failed for %s (%s: %s) — logging in without 2FA',
-                             user.username, type(e).__name__, e)
-                login(request, user)
-                messages.warning(request, 'Verification email could not be sent. Logged in without 2FA.')
-                return _safe_redirect(request)
+                logger.error(
+                    '2FA email failed for user %s (%s: %s)',
+                    user.username, type(e).__name__, e,
+                )
+                messages.error(
+                    request,
+                    'Unable to send verification code. Please try again later.',
+                )
+                return render(request, 'registration/login.html', {'form': form})
+
+            # Code sent successfully — park user id and redirect to verify page
+            request.session['2fa_user_id'] = user.pk
+            request.session['2fa_next']    = request.GET.get('next', '')
+            return redirect('wellness:verify_email')
         else:
             messages.error(request, 'Invalid username or password.')
     else:
@@ -306,14 +333,32 @@ def verify_email_view(request):
                 form.add_error('code', 'This code has expired. Please log in again to get a new one.')
                 return render(request, 'registration/verify_email.html',
                               {'form': form, 'masked_email': masked})
+
+            # Code is valid — mark used and complete login
             record.is_used = True
             record.save()
             del request.session['2fa_user_id']
             next_url = request.session.pop('2fa_next', '')
             login(request, user)
-            if next_url and next_url.startswith('/'):
-                return redirect(next_url)
-            return redirect('wellness:landing')
+
+            # ── Set Device Trust cookie ───────────────────────────────────
+            # Signed with Django's SECRET_KEY + salt so it cannot be forged.
+            # Next login from this browser will read and verify this cookie,
+            # skipping the 2FA email entirely for 30 days.
+            cookie_name = getattr(settings, 'TRUSTED_DEVICE_COOKIE', 'mc_trusted_device')
+            cookie_age  = getattr(settings, 'TRUSTED_DEVICE_COOKIE_AGE', 60 * 60 * 24 * 30)
+            redirect_to = next_url if (next_url and next_url.startswith('/')) else '/'
+            response = redirect(redirect_to)
+            response.set_signed_cookie(
+                cookie_name,
+                value=str(user.pk),
+                salt='device-trust',
+                max_age=cookie_age,
+                httponly=True,             # not accessible from JavaScript
+                secure=not settings.DEBUG, # HTTPS-only in production
+                samesite='Lax',            # CSRF protection
+            )
+            return response
     else:
         form = VerifyCodeForm()
     return render(request, 'registration/verify_email.html',
