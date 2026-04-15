@@ -93,3 +93,27 @@ class VideoComment(models.Model):
         who     = self.user.username if self.user else 'anonymous'
         preview = self.body[:50] + ('…' if len(self.body) > 50 else '')
         return f'{who} on {self.video_id}: "{preview}"'
+
+
+# ── Watch History ─────────────────────────────────────────────────────────────
+
+class WatchHistory(models.Model):
+    """
+    Records every video a logged-in user opens in the player.
+    Logged silently via a background AJAX call when the modal opens.
+    Multiple entries per (user, video_id) are allowed — each open is
+    its own row so watch frequency is queryable.
+    """
+    user       = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='watch_history'
+    )
+    video_id    = models.CharField(max_length=20, db_index=True)
+    video_title = models.CharField(max_length=255, blank=True)
+    watched_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering     = ['-watched_at']
+        verbose_name = 'Watch History Entry'
+
+    def __str__(self):
+        return f'{self.user.username} watched {self.video_id} at {self.watched_at:%Y-%m-%d %H:%M}'

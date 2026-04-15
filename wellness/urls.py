@@ -49,8 +49,12 @@ urlpatterns = [
          ),
          name='password_reset_complete'),
 
-    # ── Video-specific feedback (AJAX POST) ──────────────────────────────────
+    # Video feedback (AJAX POST)
     path('api/video/rate/',     views.video_rate,     name='video_rate'),
     path('api/video/comment/',  views.video_comment,  name='video_comment'),
     path('api/video/feedback/', views.video_feedback, name='video_feedback'),
+
+    # User profile & watch history
+    path('profile/',                       views.user_profile,          name='profile'),
+    path('api/watch/',                     views.record_watch_history,  name='record_watch'),
 ]

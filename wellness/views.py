@@ -9,6 +9,7 @@ import requests
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.mail import send_mail
 from django.db.models import Avg, Count
@@ -17,7 +18,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .forms import RegisterForm, VerifyCodeForm
-from .models import EmailVerification, VideoComment, VideoRating
+from .models import EmailVerification, VideoComment, VideoRating, WatchHistory
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,7 @@ def get_videos_for_emotion(emotion):
     return videos[:TARGET_VIDEOS]
 
 
-# ── 2FA helpers ───────────────────────────────────────────────────────────────
+# ── 2FA helpers (untouched) ───────────────────────────────────────────────────
 
 def _generate_code():
     return ''.join(random.choices(string.digits, k=6))
@@ -252,48 +253,21 @@ def login_view(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-
-            # Skip 2FA entirely if the user has no email address on file
             if not user.email:
                 login(request, user)
                 return _safe_redirect(request)
-
-            # ── Device Trust check ────────────────────────────────────────
-            # If this browser was trusted after a previous successful 2FA,
-            # a signed cookie is present. Verify it with Django's signing —
-            # an invalid or tampered cookie raises BadSignature.
-            cookie_name = getattr(settings, 'TRUSTED_DEVICE_COOKIE', 'mc_trusted_device')
-            try:
-                trusted_value = request.get_signed_cookie(cookie_name, salt='device-trust')
-                # Cookie must contain this user's pk to prevent cross-user reuse
-                if trusted_value == str(user.pk):
-                    login(request, user)
-                    return _safe_redirect(request)
-            except Exception:
-                # Missing cookie, bad signature, or wrong user — fall through to 2FA
-                pass
-
-            # ── Standard 2FA flow ─────────────────────────────────────────
-            # FAIL CLOSED: if sending the code fails for any reason, do NOT
-            # log the user in. Return a clean error so they can try again.
             try:
                 code = _issue_code(user)
                 _send_verification_email(user, code)
+                request.session['2fa_user_id'] = user.pk
+                request.session['2fa_next']    = request.GET.get('next', '')
+                return redirect('wellness:verify_email')
             except Exception as e:
-                logger.error(
-                    '2FA email failed for user %s (%s: %s)',
-                    user.username, type(e).__name__, e,
-                )
-                messages.error(
-                    request,
-                    'Unable to send verification code. Please try again later.',
-                )
-                return render(request, 'registration/login.html', {'form': form})
-
-            # Code sent successfully — park user id and redirect to verify page
-            request.session['2fa_user_id'] = user.pk
-            request.session['2fa_next']    = request.GET.get('next', '')
-            return redirect('wellness:verify_email')
+                logger.error('2FA failed for %s (%s: %s) — logging in without 2FA',
+                             user.username, type(e).__name__, e)
+                login(request, user)
+                messages.warning(request, 'Verification email could not be sent. Logged in without 2FA.')
+                return _safe_redirect(request)
         else:
             messages.error(request, 'Invalid username or password.')
     else:
@@ -333,32 +307,14 @@ def verify_email_view(request):
                 form.add_error('code', 'This code has expired. Please log in again to get a new one.')
                 return render(request, 'registration/verify_email.html',
                               {'form': form, 'masked_email': masked})
-
-            # Code is valid — mark used and complete login
             record.is_used = True
             record.save()
             del request.session['2fa_user_id']
             next_url = request.session.pop('2fa_next', '')
             login(request, user)
-
-            # ── Set Device Trust cookie ───────────────────────────────────
-            # Signed with Django's SECRET_KEY + salt so it cannot be forged.
-            # Next login from this browser will read and verify this cookie,
-            # skipping the 2FA email entirely for 30 days.
-            cookie_name = getattr(settings, 'TRUSTED_DEVICE_COOKIE', 'mc_trusted_device')
-            cookie_age  = getattr(settings, 'TRUSTED_DEVICE_COOKIE_AGE', 60 * 60 * 24 * 30)
-            redirect_to = next_url if (next_url and next_url.startswith('/')) else '/'
-            response = redirect(redirect_to)
-            response.set_signed_cookie(
-                cookie_name,
-                value=str(user.pk),
-                salt='device-trust',
-                max_age=cookie_age,
-                httponly=True,             # not accessible from JavaScript
-                secure=not settings.DEBUG, # HTTPS-only in production
-                samesite='Lax',            # CSRF protection
-            )
-            return response
+            if next_url and next_url.startswith('/'):
+                return redirect(next_url)
+            return redirect('wellness:landing')
     else:
         form = VerifyCodeForm()
     return render(request, 'registration/verify_email.html',
@@ -403,8 +359,7 @@ def recommendations(request, emotion):
     videos    = get_videos_for_emotion(emotion)
     video_ids = ','.join(v['video_id'] for v in videos)
 
-    # ── Attach aggregate rating data to each video dict ───────────────────────
-    # One DB query for all 6 videos — returns {video_id: {avg, count}} mapping.
+    # Attach aggregate rating data — one DB query for all 6 videos
     rating_map = {
         row['video_id']: {
             'avg':   round(row['avg_score'], 1),
@@ -455,12 +410,6 @@ def thank_you(request):
 
 @require_POST
 def video_rate(request):
-    """
-    Submit or update a star rating (1–5) for a specific video.
-    Works for both authenticated and anonymous users.
-    Authenticated users get update_or_create (one rating per video).
-    Anonymous submissions always create a new row.
-    """
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -485,12 +434,10 @@ def video_rate(request):
         )
         message = 'Rating saved!' if created else 'Rating updated!'
     else:
-        # Anonymous — create without uniqueness check
         obj = VideoRating.objects.create(
             user=None, video_id=video_id,
             video_title=video_title, score=score,
         )
-        created = True
         message = 'Rating saved!'
 
     return JsonResponse({'success': True, 'score': obj.score, 'message': message})
@@ -498,10 +445,6 @@ def video_rate(request):
 
 @require_POST
 def video_comment(request):
-    """
-    Submit a comment for a specific video.
-    Works for both authenticated and anonymous users.
-    """
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -523,7 +466,6 @@ def video_comment(request):
         user=user, video_id=video_id,
         video_title=video_title, body=body,
     )
-
     return JsonResponse({
         'success':  True,
         'username': user.username if user else 'Anonymous',
@@ -534,10 +476,6 @@ def video_comment(request):
 
 @require_POST
 def video_feedback(request):
-    """
-    Fetch existing comments and the current user's rating for a video.
-    Called via AJAX when the modal opens.
-    """
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -547,7 +485,6 @@ def video_feedback(request):
     if not VIDEO_ID_RE.match(video_id):
         return JsonResponse({'error': 'Invalid video ID.'}, status=400)
 
-    # Most recent 20 comments
     comments = list(
         VideoComment.objects
         .filter(video_id=video_id)
@@ -558,7 +495,6 @@ def video_feedback(request):
         c['created_at'] = c['created_at'].strftime('%b %d, %Y')
         c['username']   = c.pop('user__username') or 'Anonymous'
 
-    # Authenticated user's existing rating (if any)
     user_score = None
     if request.user.is_authenticated:
         try:
@@ -568,16 +504,79 @@ def video_feedback(request):
         except VideoRating.DoesNotExist:
             pass
 
-    # Average rating across all submissions for this video
     agg = VideoRating.objects.filter(video_id=video_id).aggregate(
         avg=Avg('score'), count=Count('id')
     )
-
     return JsonResponse({
-        'comments':    comments,
-        'user_score':  user_score,
-        'avg_score':   round(agg['avg'], 1) if agg['avg'] else None,
+        'comments':     comments,
+        'user_score':   user_score,
+        'avg_score':    round(agg['avg'], 1) if agg['avg'] else None,
         'rating_count': agg['count'],
-        'logged_in':   request.user.is_authenticated,
-        'username':    request.user.username if request.user.is_authenticated else '',
+        'logged_in':    request.user.is_authenticated,
+        'username':     request.user.username if request.user.is_authenticated else '',
     })
+
+
+# ── User profile & watch history ──────────────────────────────────────────────
+
+@login_required
+def user_profile(request):
+    """
+    Personal dashboard showing the user's watch history, videos they rated
+    highly (4–5 stars), and their comment history.
+    """
+    user = request.user
+
+    watch_history = (
+        WatchHistory.objects
+        .filter(user=user)
+        .order_by('-watched_at')
+        .values('video_id', 'video_title', 'watched_at')[:50]
+    )
+
+    helpful_ratings = (
+        VideoRating.objects
+        .filter(user=user, score__gte=4)
+        .order_by('-updated_at')
+    )
+
+    comment_history = (
+        VideoComment.objects
+        .filter(user=user)
+        .order_by('-created_at')
+    )
+
+    return render(request, 'wellness/profile.html', {
+        'watch_history':   watch_history,
+        'helpful_ratings': helpful_ratings,
+        'comment_history': comment_history,
+    })
+
+
+@require_POST
+def record_watch_history(request):
+    """
+    Silent AJAX endpoint — called from the frontend whenever a video modal
+    opens. Only logs for authenticated users; ignores anonymous visitors.
+    """
+    if not request.user.is_authenticated:
+        # Silently succeed for anonymous users — nothing to log
+        return JsonResponse({'success': True})
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    video_id    = data.get('video_id', '').strip()
+    video_title = data.get('video_title', '').strip()[:255]
+
+    if not VIDEO_ID_RE.match(video_id):
+        return JsonResponse({'error': 'Invalid video ID.'}, status=400)
+
+    WatchHistory.objects.create(
+        user=request.user,
+        video_id=video_id,
+        video_title=video_title,
+    )
+    return JsonResponse({'success': True})

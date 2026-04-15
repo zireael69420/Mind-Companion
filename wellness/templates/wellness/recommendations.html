@@ -318,6 +318,7 @@ FILE: wellness/templates/wellness/recommendations.html
     <div class="auth-bar">
       {% if user.is_authenticated %}
         <span class="auth-greeting">👋 {{ user.username }}</span>
+        <a href="{% url 'wellness:profile' %}" class="auth-link">My Profile</a>
         <a href="{% url 'wellness:logout' %}" class="auth-link">Log out</a>
       {% else %}
         <a href="{% url 'wellness:login' %}?next={{ request.path }}" class="auth-link">Log in</a>
@@ -424,6 +425,13 @@ function openModal(videoId, title, channel, watchUrl, avgScore, ratingCount) {
 
   currentVideoId    = cleanId;
   currentVideoTitle = decodeHtml(title);
+
+  // Silently log this view to the user's watch history (no-op for anonymous users)
+  fetch("{% url 'wellness:record_watch' %}", {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ video_id: cleanId, video_title: decodeHtml(title) }),
+  }).catch(() => {}); // fire-and-forget — never block the modal open on failure
 
   // Reset player
   iframe.src = '';
