@@ -109,7 +109,7 @@ class WatchHistory(models.Model):
     )
     video_id    = models.CharField(max_length=20, db_index=True)
     video_title = models.CharField(max_length=255, blank=True)
-    watched_at  = models.DateTimeField(auto_now_add=True)
+    watched_at  = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering     = ['-watched_at']

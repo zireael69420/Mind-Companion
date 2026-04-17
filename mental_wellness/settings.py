@@ -125,20 +125,21 @@ STORAGES = {
 # Do NOT raise ValueError for manifest misses (admin fonts, etc.)
 WHITENOISE_MANIFEST_STRICT = False
 
-# ── Email — 2FA verification codes via Brevo (Sendinblue) ────────────────────
-# Uses django-anymail to route through Brevo's transactional API,
-# bypassing SMTP port restrictions common on cloud providers like Render.
+# ── Email — 2FA verification codes via Resend ─────────────────────────────────
+# Uses django-anymail to route through Resend's transactional API.
 #
 # Required Render environment variable:
-#   SENDINBLUE_API_KEY  — from Brevo dashboard → SMTP & API → API Keys → Create
+#   RESEND_API_KEY     — from Resend dashboard → API Keys → Create API Key
 #
-# DEFAULT_FROM_EMAIL must exactly match a verified sender in your Brevo account.
+# DEFAULT_FROM_EMAIL must match a domain you have verified in Resend.
 # Set it as a Render env var, e.g.: Mind Companion <noreply@yourdomain.com>
+# If you haven't verified a custom domain yet, Resend allows sending from
+# onboarding@resend.dev for testing only — set up a real domain for production.
 
-EMAIL_BACKEND = 'anymail.backends.sendinblue.EmailBackend'
+EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
 
 ANYMAIL = {
-    'SENDINBLUE_API_KEY': os.environ.get('SENDINBLUE_API_KEY', ''),
+    'RESEND_API_KEY': os.environ.get('RESEND_API_KEY', ''),
 }
 
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@mindcompanion.app')

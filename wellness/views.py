@@ -528,15 +528,8 @@ def video_feedback(request):
 
 @login_required
 def user_profile(request):
-    """
-    Personal dashboard showing the user's watch history, videos they rated
-    highly (4–5 stars), and their comment history.
-    """
-    user = request.user
 
-    # Convert to list so the template can use |length freely.
-    # Sliced querysets (.values(...)[:50]) raise TypeError with Django's
-    # |length filter because sliced querysets don't support len().
+    user = request.user
     watch_history = list(
         WatchHistory.objects
         .filter(user=user)
@@ -560,7 +553,6 @@ def user_profile(request):
         'watch_history':        watch_history,
         'helpful_ratings':      helpful_ratings,
         'comment_history':      comment_history,
-        # Pass counts explicitly — avoids any queryset evaluation issues
         'watch_history_count':  len(watch_history),
         'helpful_count':        len(helpful_ratings),
         'comment_count':        len(comment_history),
@@ -569,12 +561,8 @@ def user_profile(request):
 
 @require_POST
 def record_watch_history(request):
-    """
-    Silent AJAX endpoint — called from the frontend whenever a video modal
-    opens. Only logs for authenticated users; ignores anonymous visitors.
-    """
+
     if not request.user.is_authenticated:
-        # Silently succeed for anonymous users — nothing to log
         return JsonResponse({'success': True})
 
     try:
@@ -588,9 +576,12 @@ def record_watch_history(request):
     if not VIDEO_ID_RE.match(video_id):
         return JsonResponse({'error': 'Invalid video ID.'}, status=400)
 
-    WatchHistory.objects.create(
+    WatchHistory.objects.update_or_create(
         user=request.user,
         video_id=video_id,
-        video_title=video_title,
+        defaults={
+            'video_title': video_title,
+            'watched_at':  timezone.now(),
+        },
     )
     return JsonResponse({'success': True})
