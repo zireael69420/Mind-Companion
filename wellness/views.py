@@ -15,6 +15,7 @@ from django.core.mail import send_mail
 from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import RegisterForm, VerifyCodeForm
@@ -202,7 +203,7 @@ def get_videos_for_emotion(emotion):
     return videos[:TARGET_VIDEOS]
 
 
-# ── 2FA helpers (untouched) ───────────────────────────────────────────────────
+# ── 2FA helpers ───────────────────────────────────────────────────────────────
 
 def _generate_code():
     return ''.join(random.choices(string.digits, k=6))
@@ -229,7 +230,7 @@ def _issue_code(user):
     return code
 
 
-# ── Auth views (untouched) ────────────────────────────────────────────────────
+# ── Auth views ────────────────────────────────────────────────────────────────
 
 def register_view(request):
     if request.user.is_authenticated:
@@ -528,8 +529,14 @@ def video_feedback(request):
 
 @login_required
 def user_profile(request):
-
+    """
+    Personal dashboard showing the user's watch history, videos they rated
+    highly (4–5 stars), and their comment history.
+    """
     user = request.user
+
+    # list() so the template can call |length without hitting the sliced-
+    # queryset TypeError that auto_now_add fields can trigger.
     watch_history = list(
         WatchHistory.objects
         .filter(user=user)
@@ -550,18 +557,28 @@ def user_profile(request):
     )
 
     return render(request, 'wellness/profile.html', {
-        'watch_history':        watch_history,
-        'helpful_ratings':      helpful_ratings,
-        'comment_history':      comment_history,
-        'watch_history_count':  len(watch_history),
-        'helpful_count':        len(helpful_ratings),
-        'comment_count':        len(comment_history),
+        'watch_history':       watch_history,
+        'helpful_ratings':     helpful_ratings,
+        'comment_history':     comment_history,
+        'watch_history_count': len(watch_history),
+        'helpful_count':       len(helpful_ratings),
+        'comment_count':       len(comment_history),
     })
 
 
 @require_POST
 def record_watch_history(request):
+    """
+    Silent AJAX endpoint called whenever a logged-in user opens a video modal.
+    Anonymous visitors are ignored silently.
 
+    Upsert logic — one row per (user, video_id):
+      • Row exists  → update watched_at to now() so the video floats to the
+                      top of the profile history list.
+      • No row yet  → create it.
+    The whole DB operation is wrapped in try/except so any unexpected error
+    returns a clean JSON response instead of an unhandled exception.
+    """
     if not request.user.is_authenticated:
         return JsonResponse({'success': True})
 
@@ -576,12 +593,31 @@ def record_watch_history(request):
     if not VIDEO_ID_RE.match(video_id):
         return JsonResponse({'error': 'Invalid video ID.'}, status=400)
 
-    WatchHistory.objects.update_or_create(
-        user=request.user,
-        video_id=video_id,
-        defaults={
-            'video_title': video_title,
-            'watched_at':  timezone.now(),
-        },
-    )
+    try:
+        WatchHistory.objects.update_or_create(
+            user=request.user,
+            video_id=video_id,
+            defaults={
+                'video_title': video_title,
+                'watched_at':  timezone.now(),
+            },
+        )
+    except Exception as e:
+        logger.error('record_watch_history DB error for %s / %s: %s',
+                     request.user.username, video_id, e)
+        return JsonResponse({'error': 'Could not save watch history.'}, status=500)
+
     return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def clear_watch_history(request):
+    """
+    Deletes all WatchHistory rows for the logged-in user and redirects back
+    to their profile dashboard with a success message.
+    Only accepts POST — the template uses a <form method="POST"> for CSRF safety.
+    """
+    WatchHistory.objects.filter(user=request.user).delete()
+    messages.success(request, 'Your watch history has been securely cleared.')
+    return redirect('wellness:profile')

@@ -180,6 +180,19 @@
   <!-- Tab: Watch history -->
   <div id="tab-history" class="tab-panel">
     {% if watch_history %}
+    <form method="POST" action="{% url 'wellness:clear_watch_history' %}"
+      style="text-align:right; margin-bottom:0.75rem;"
+      onsubmit="return confirm('Clear your entire watch history?')">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-outline-danger"
+          style="font-size:0.75rem; padding:0.3rem 0.85rem; border-radius:999px;
+                 border:1.5px solid #E05C6A; background:transparent; color:#E05C6A;
+                 cursor:pointer; transition:background 0.18s, color 0.18s;"
+          onmouseover="this.style.background='#E05C6A';this.style.color='white'"
+          onmouseout="this.style.background='transparent';this.style.color='#E05C6A'">
+    🗑 Clear History
+  </button>
+</form>
       <div class="card-list">
         {% for entry in watch_history %}
         <div class="entry-card">
