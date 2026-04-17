@@ -102,14 +102,33 @@
   <h1>Create Account</h1>
   <p class="sub">Join to save your progress and give video feedback</p>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{% if 'error' in message.tags %}danger{% else %}{{ message.tags }}{% endif %}"
-          role="alert">
-        {{ message }}
-      </div>
-    {% endfor %}
-  {% endif %}
+<style>
+  .auth-alert {
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    font-family: sans-serif;
+  }
+  .auth-alert-success {
+    background-color: #d1e7dd;
+    border: 1px solid #badbcc;
+    color: #0f5132;
+  }
+  .auth-alert-danger {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #842029;
+  }
+</style>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="auth-alert {% if 'error' in message.tags %}auth-alert-danger{% else %}auth-alert-success{% endif %}">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
 
   <div class="password-hint">
     <strong>Strong password required:</strong> at least 8 characters, not a common word,
