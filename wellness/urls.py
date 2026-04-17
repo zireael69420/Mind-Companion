@@ -55,6 +55,7 @@ urlpatterns = [
     path('api/video/feedback/', views.video_feedback, name='video_feedback'),
 
     # User profile & watch history
-    path('profile/',                       views.user_profile,          name='profile'),
-    path('api/watch/',                     views.record_watch_history,  name='record_watch'),
+    path('profile/',               views.user_profile,         name='profile'),
+    path('api/watch/',             views.record_watch_history, name='record_watch'),
+    path('profile/clear-history/', views.clear_watch_history,  name='clear_watch_history'),
 ]
